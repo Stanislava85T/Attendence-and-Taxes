@@ -248,7 +248,7 @@
         </div>
         <div class="login-field">
             <label>Парола</label>
-            <input type="password" id="loginPassword" placeholder="adminvanessa"
+            <input type="password" id="loginPassword" placeholder="••••••••"
                    onkeydown="if(event.key==='Enter') doLogin()">
         </div>
         <button class="btn-login" id="loginBtn" onclick="doLogin()">🔐 Влез</button>
@@ -452,7 +452,7 @@ window.doLogin = async function() {
     try {
         await signInWithEmailAndPassword(auth, email, pass);
     } catch(e) {
-        err.textContent = '❌ Грешен имейл или парола!';
+        err.textContent = '❌ ' + e.code;
         btn.disabled = false; btn.textContent = '🔐 Влез';
     }
 }
