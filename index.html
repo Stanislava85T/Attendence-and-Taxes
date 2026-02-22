@@ -1,753 +1,735 @@
 <!DOCTYPE html>
 <html lang="bg">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0f0f1a">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Клуб">
-    <title>Клуб — Присъствие</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg:#0f0f1a; --surface:#1a1a2e; --surface2:#16213e;
-            --accent:#e94560; --accent2:#f5a623; --green:#00d4aa;
-            --text:#eaeaea; --text-dim:#8888aa; --border:rgba(255,255,255,0.08); --radius:14px;
-        }
-        *{margin:0;padding:0;box-sizing:border-box;}
-        body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
-
-        #loadingScreen{display:flex;justify-content:center;align-items:center;min-height:100vh;flex-direction:column;gap:16px;}
-        .spinner{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
-        @keyframes spin{to{transform:rotate(360deg);}}
-
-        #loginScreen{display:none;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;padding:20px;position:relative;overflow:hidden;}
-        #loginScreen::before{content:'';position:absolute;width:600px;height:600px;background:radial-gradient(circle,rgba(233,69,96,0.15) 0%,transparent 70%);top:-200px;left:-200px;pointer-events:none;}
-        #loginScreen::after{content:'';position:absolute;width:500px;height:500px;background:radial-gradient(circle,rgba(0,212,170,0.1) 0%,transparent 70%);bottom:-150px;right:-150px;pointer-events:none;}
-        .login-card{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:48px 40px;width:100%;max-width:420px;position:relative;z-index:1;box-shadow:0 40px 80px rgba(0,0,0,0.5);}
-        .login-logo{text-align:center;margin-bottom:32px;}
-        .login-logo .icon{display:inline-flex;align-items:center;justify-content:center;width:72px;height:72px;background:linear-gradient(135deg,var(--accent),#ff6b6b);border-radius:20px;font-size:2em;margin-bottom:16px;box-shadow:0 8px 24px rgba(233,69,96,0.4);}
-        .login-logo h1{font-size:1.8em;font-weight:800;letter-spacing:-0.5px;}
-        .login-logo p{color:var(--text-dim);font-size:0.9em;margin-top:4px;}
-        .login-field{margin-bottom:16px;}
-        .login-field label{display:block;font-size:0.8em;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
-        .login-field input,.login-field select{width:100%;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Sora',sans-serif;font-size:1em;transition:all 0.2s;}
-        .login-field input:focus,.login-field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(233,69,96,0.15);}
-        .login-field select option{background:var(--surface2);}
-        .btn-login{width:100%;padding:15px;background:linear-gradient(135deg,var(--accent),#ff6b6b);color:white;border:none;border-radius:10px;font-family:'Sora',sans-serif;font-size:1em;font-weight:700;cursor:pointer;margin-top:8px;transition:all 0.3s;}
-        .btn-login:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(233,69,96,0.4);}
-        .btn-login:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
-        #loginError{color:var(--accent);font-size:0.85em;text-align:center;margin-top:12px;min-height:20px;}
-
-        #appScreen{display:none;min-height:100vh;}
-        .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:200;}
-        .topbar-brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:1.1em;}
-        .topbar-brand .dot{width:10px;height:10px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);animation:pulse 2s infinite;}
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-        .topbar-right{display:flex;align-items:center;gap:12px;}
-        .user-chip{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:6px 14px 6px 8px;}
-        .user-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8em;color:white;}
-        .avatar-admin{background:linear-gradient(135deg,var(--accent2),#e67e22);}
-        .avatar-trainer{background:linear-gradient(135deg,var(--green),#00a884);}
-        .user-info-name{font-weight:600;font-size:0.85em;}
-        .user-info-role{font-size:0.7em;color:var(--text-dim);}
-        .btn-out{background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:0.85em;font-family:'Sora',sans-serif;transition:all 0.2s;}
-        .btn-out:hover{border-color:var(--accent);color:var(--accent);}
-
-        .app-body{padding:24px;max-width:1400px;margin:0 auto;}
-
-        .admin-panel{background:var(--surface);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius);padding:24px;margin-bottom:24px;}
-        .admin-panel h2{font-size:1em;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:1px;margin-bottom:20px;}
-        .admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
-        @media(max-width:700px){.admin-grid{grid-template-columns:1fr;}}
-        .admin-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:20px;}
-        .admin-box h3{font-size:0.85em;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;}
-        .field-group{margin-bottom:12px;}
-        .field-group label{display:block;font-size:0.75em;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.8px;}
-        .field-group input{width:100%;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:0.9em;transition:all 0.2s;}
-        .field-group input:focus{outline:none;border-color:var(--accent2);}
-        #addTrainerMsg{font-size:0.8em;min-height:18px;margin-bottom:8px;}
-        .btn-add-trainer{width:100%;padding:11px;background:linear-gradient(135deg,var(--accent2),#e67e22);color:#1a1a00;border:none;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:0.9em;cursor:pointer;transition:all 0.2s;}
-        .btn-add-trainer:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(245,166,35,0.4);}
-        .trainer-list{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;}
-        .trainer-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:0.85em;}
-        .trainer-row-name{font-weight:600;}
-        .trainer-row-sub{color:var(--text-dim);font-size:0.8em;}
-        .btn-del-trainer{background:rgba(233,69,96,0.15);color:var(--accent);border:1px solid rgba(233,69,96,0.3);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.8em;font-family:'Sora',sans-serif;transition:all 0.2s;}
-        .btn-del-trainer:hover{background:rgba(233,69,96,0.3);}
-
-        .view-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
-        .view-bar label{font-size:0.8em;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;}
-        .view-bar select{padding:9px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:0.9em;cursor:pointer;}
-        .view-bar select option{background:var(--surface2);}
-        .viewing-badge{background:rgba(0,212,170,0.15);color:var(--green);border:1px solid rgba(0,212,170,0.3);border-radius:100px;padding:5px 14px;font-size:0.8em;font-weight:600;display:none;}
-
-        .month-nav{display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:24px;}
-        .month-nav h2{font-size:1.6em;font-weight:800;min-width:260px;text-align:center;letter-spacing:-0.5px;}
-        .btn-month{background:var(--surface);border:1px solid var(--border);color:var(--text);width:42px;height:42px;border-radius:10px;font-size:1.1em;cursor:pointer;transition:all 0.2s;font-family:'Sora',sans-serif;}
-        .btn-month:hover{border-color:var(--accent);color:var(--accent);}
-
-        .controls-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
-        .controls-bar input[type="text"]{flex:1;min-width:180px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:0.9em;transition:all 0.2s;}
-        .controls-bar input[type="text"]:focus{outline:none;border-color:var(--accent);}
-        .controls-bar select{padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:0.9em;cursor:pointer;}
-        .controls-bar select option{background:var(--surface2);}
-        .btn-action{padding:10px 18px;border:none;border-radius:8px;font-family:'Sora',sans-serif;font-size:0.9em;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
-        .btn-red{background:linear-gradient(135deg,var(--accent),#ff6b6b);color:white;}
-        .btn-red:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(233,69,96,0.4);}
-        .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text-dim);}
-        .btn-outline:hover{border-color:var(--text);color:var(--text);}
-
-        .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;}
-        @media(max-width:600px){.stats-row{grid-template-columns:repeat(2,1fr);}}
-        .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center;}
-        .stat-card .val{font-size:2.2em;font-weight:800;letter-spacing:-1px;line-height:1;margin-bottom:6px;}
-        .stat-card .lbl{font-size:0.7em;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);}
-        .stat-red .val{color:var(--accent);}
-        .stat-green .val{color:var(--green);}
-        .stat-yellow .val{color:var(--accent2);}
-
-        .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;margin-bottom:20px;}
-        table{width:100%;border-collapse:collapse;}
-        thead tr{background:var(--surface2);}
-        th{padding:12px 8px;text-align:center;font-size:0.7em;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.8px;border-bottom:1px solid var(--border);white-space:nowrap;}
-        th.name-col{text-align:left;padding-left:20px;min-width:180px;position:sticky;left:0;background:var(--surface2);z-index:10;border-right:1px solid var(--border);}
-        td{padding:10px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.04);font-size:0.85em;}
-        td.name-td{text-align:left;padding-left:20px;font-weight:600;position:sticky;left:0;background:var(--surface);z-index:5;border-right:1px solid var(--border);}
-        tbody tr:hover td{background:rgba(255,255,255,0.03);}
-        tbody tr:hover td.name-td{background:rgba(255,255,255,0.05);}
-        .th-weekend{color:rgba(245,166,35,0.7)!important;}
-        .td-weekend{background:rgba(245,166,35,0.04);}
-        .td-today{background:rgba(0,212,170,0.08)!important;}
-        .th-today{color:var(--green)!important;}
-        input[type="checkbox"]{width:18px;height:18px;cursor:pointer;accent-color:var(--accent);}
-        .total-col{background:rgba(233,69,96,0.08)!important;color:var(--accent);font-weight:700;font-size:1em!important;border-left:1px solid rgba(233,69,96,0.2)!important;}
-        .move-btn{background:transparent;border:1px solid var(--border);color:var(--text-dim);width:20px;height:20px;border-radius:4px;cursor:pointer;font-size:0.65em;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;}
-        .move-btn:hover{border-color:var(--green);color:var(--green);}
-        .move-btn:disabled{opacity:0.2;cursor:not-allowed;}
-        .name-moves{display:flex;align-items:center;gap:6px;}
-        .moves-col{display:flex;flex-direction:column;gap:2px;}
-        .row-actions{display:flex;gap:4px;justify-content:center;}
-        .btn-edit,.btn-del{padding:4px 9px;border-radius:6px;cursor:pointer;font-size:0.75em;font-family:'Sora',sans-serif;font-weight:600;border:none;transition:all 0.2s;}
-        .btn-edit{background:rgba(245,166,35,0.2);color:var(--accent2);}
-        .btn-edit:hover{background:rgba(245,166,35,0.35);}
-        .btn-del{background:rgba(233,69,96,0.15);color:var(--accent);}
-        .btn-del:hover{background:rgba(233,69,96,0.3);}
-
-        .section-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
-        @media(max-width:900px){.section-grid{grid-template-columns:1fr;}}
-        .section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-        .section-header{padding:16px 20px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:700;font-size:0.85em;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);}
-        .sum-table{width:100%;border-collapse:collapse;}
-        .sum-table td{padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:0.85em;}
-        .sum-table td:last-child{text-align:right;font-weight:700;color:var(--accent);}
-        .sum-table .total-sum-row td{background:rgba(233,69,96,0.08);font-size:0.9em;border-bottom:none;}
-        .sum-table .total-sum-row td:last-child{color:var(--green);font-size:1.1em;}
-        .fee-input{padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.85em;width:85px;transition:all 0.2s;}
-        .fee-input:focus{outline:none;border-color:var(--green);}
-        .fee-date{padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Sora',sans-serif;font-size:0.75em;width:120px;}
-        .fee-date:focus{outline:none;border-color:var(--green);}
-        .badge-paid{background:rgba(0,212,170,0.2);color:var(--green);padding:3px 9px;border-radius:100px;font-size:0.75em;font-weight:700;border:1px solid rgba(0,212,170,0.3);}
-        .badge-unpaid{background:rgba(233,69,96,0.15);color:var(--accent);padding:3px 9px;border-radius:100px;font-size:0.75em;font-weight:700;border:1px solid rgba(233,69,96,0.3);}
-        .btn-pay{padding:5px 10px;border-radius:6px;font-size:0.75em;font-weight:700;font-family:'Sora',sans-serif;cursor:pointer;border:none;transition:all 0.2s;}
-        .btn-pay-yes{background:rgba(0,212,170,0.2);color:var(--green);}
-        .btn-pay-yes:hover{background:rgba(0,212,170,0.35);}
-        .btn-pay-no{background:rgba(233,69,96,0.15);color:var(--accent);}
-        .btn-pay-no:hover{background:rgba(233,69,96,0.3);}
-        .fee-total-row td{background:rgba(0,212,170,0.08)!important;font-weight:700;}
-
-        @media(max-width:600px){
-            .topbar{padding:0 16px;}
-            .app-body{padding:16px;}
-            .month-nav h2{font-size:1.2em;min-width:190px;}
-            .controls-bar{flex-direction:column;}
-            .controls-bar input[type="text"]{min-width:100%;}
-        }
-    </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<title>Клуб — Присъствие</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f0f1a;--surface:#1a1a2e;--surface2:#16213e;--accent:#e94560;--accent2:#f5a623;--green:#00d4aa;--text:#eaeaea;--text-dim:#8888aa;--border:rgba(255,255,255,0.08);--radius:14px;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+#loadingScreen{display:flex;justify-content:center;align-items:center;min-height:100vh;flex-direction:column;gap:16px;}
+.spinner{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#authScreen{display:none;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;padding:20px;position:relative;overflow:hidden;}
+#authScreen::before{content:'';position:absolute;width:600px;height:600px;background:radial-gradient(circle,rgba(233,69,96,0.15) 0%,transparent 70%);top:-200px;left:-200px;pointer-events:none;}
+#authScreen::after{content:'';position:absolute;width:500px;height:500px;background:radial-gradient(circle,rgba(0,212,170,0.1) 0%,transparent 70%);bottom:-150px;right:-150px;pointer-events:none;}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:40px;width:100%;max-width:440px;position:relative;z-index:1;box-shadow:0 40px 80px rgba(0,0,0,0.5);}
+.auth-logo{text-align:center;margin-bottom:28px;}
+.auth-logo .icon{display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;background:linear-gradient(135deg,var(--accent),#ff6b6b);border-radius:18px;font-size:1.8em;margin-bottom:12px;box-shadow:0 8px 24px rgba(233,69,96,0.4);}
+.auth-logo h1{font-size:1.6em;font-weight:800;letter-spacing:-0.5px;}
+.auth-logo p{color:var(--text-dim);font-size:0.85em;margin-top:4px;}
+.auth-tabs{display:flex;margin-bottom:24px;background:var(--surface2);border-radius:10px;padding:4px;gap:4px;}
+.auth-tab{flex:1;padding:10px;text-align:center;border-radius:8px;cursor:pointer;font-size:0.9em;font-weight:600;transition:all 0.2s;color:var(--text-dim);}
+.auth-tab.active{background:var(--accent);color:white;}
+.auth-field{margin-bottom:14px;}
+.auth-field label{display:block;font-size:0.75em;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px;}
+.auth-field input{width:100%;padding:13px 15px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Sora',sans-serif;font-size:0.95em;transition:all 0.2s;}
+.auth-field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(233,69,96,0.15);}
+.btn-auth{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),#ff6b6b);color:white;border:none;border-radius:10px;font-family:'Sora',sans-serif;font-size:1em;font-weight:700;cursor:pointer;margin-top:6px;transition:all 0.3s;}
+.btn-auth:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(233,69,96,0.4);}
+.btn-auth.green{background:linear-gradient(135deg,var(--green),#00a884);color:#001a14;}
+.auth-msg{font-size:0.85em;text-align:center;margin-top:12px;min-height:20px;}
+.auth-msg.error{color:var(--accent);}
+.auth-msg.success{color:var(--green);}
+#appScreen{display:none;min-height:100vh;}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:200;}
+.topbar-brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:1.1em;}
+.dot{width:10px;height:10px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.topbar-right{display:flex;align-items:center;gap:12px;}
+.user-chip{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:6px 14px 6px 8px;}
+.user-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8em;color:white;}
+.av-super{background:linear-gradient(135deg,#e94560,#c0392b);}
+.av-admin{background:linear-gradient(135deg,var(--accent2),#e67e22);}
+.av-trainer{background:linear-gradient(135deg,var(--green),#00a884);}
+.user-info-name{font-weight:600;font-size:0.85em;}
+.user-info-role{font-size:0.7em;color:var(--text-dim);}
+.btn-out{background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:0.85em;font-family:'Sora',sans-serif;transition:all 0.2s;}
+.btn-out:hover{border-color:var(--accent);color:var(--accent);}
+.app-body{padding:24px;max-width:1400px;margin:0 auto;}
+.clubs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px;}
+.club-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;cursor:pointer;transition:all 0.2s;}
+.club-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.club-card.active{border-color:var(--accent);background:rgba(233,69,96,0.08);}
+.club-card-name{font-weight:700;font-size:1.1em;margin-bottom:8px;}
+.club-card-stats{color:var(--text-dim);font-size:0.8em;display:flex;gap:16px;margin-top:8px;}
+.club-card-stats span{color:var(--text);font-weight:600;}
+.section-title{font-size:1.1em;font-weight:700;color:var(--accent2);margin-bottom:16px;}
+.admin-panel{background:var(--surface);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius);padding:24px;margin-bottom:24px;}
+.admin-panel h2{font-size:1em;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:1px;margin-bottom:20px;}
+.admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:700px){.admin-grid{grid-template-columns:1fr;}}
+.admin-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:20px;}
+.admin-box h3{font-size:0.85em;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;}
+.field-group{margin-bottom:12px;}
+.field-group label{display:block;font-size:0.75em;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.8px;}
+.field-group input{width:100%;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:0.9em;transition:all 0.2s;}
+.field-group input:focus{outline:none;border-color:var(--accent2);}
+#addTrainerMsg{font-size:0.8em;min-height:18px;margin-bottom:8px;}
+.btn-add{width:100%;padding:11px;background:linear-gradient(135deg,var(--accent2),#e67e22);color:#1a1a00;border:none;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:0.9em;cursor:pointer;transition:all 0.2s;}
+.btn-add:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(245,166,35,0.4);}
+.trainer-list{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;}
+.trainer-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:0.85em;}
+.t-name{font-weight:600;}.t-sub{color:var(--text-dim);font-size:0.8em;}
+.btn-del-t{background:rgba(233,69,96,0.15);color:var(--accent);border:1px solid rgba(233,69,96,0.3);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.8em;font-family:'Sora',sans-serif;transition:all 0.2s;}
+.btn-del-t:hover{background:rgba(233,69,96,0.3);}
+.view-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.view-bar label{font-size:0.8em;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;}
+.view-bar select{padding:9px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:0.9em;cursor:pointer;}
+.view-bar select option{background:var(--surface2);}
+.v-badge{background:rgba(0,212,170,0.15);color:var(--green);border:1px solid rgba(0,212,170,0.3);border-radius:100px;padding:5px 14px;font-size:0.8em;font-weight:600;display:none;}
+.month-nav{display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:24px;}
+.month-nav h2{font-size:1.6em;font-weight:800;min-width:260px;text-align:center;}
+.btn-m{background:var(--surface);border:1px solid var(--border);color:var(--text);width:42px;height:42px;border-radius:10px;font-size:1.1em;cursor:pointer;transition:all 0.2s;font-family:'Sora',sans-serif;}
+.btn-m:hover{border-color:var(--accent);color:var(--accent);}
+.controls-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.controls-bar input[type="text"]{flex:1;min-width:180px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:0.9em;}
+.controls-bar input[type="text"]:focus{outline:none;border-color:var(--accent);}
+.controls-bar select{padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:0.9em;cursor:pointer;}
+.controls-bar select option{background:var(--surface2);}
+.btn-a{padding:10px 18px;border:none;border-radius:8px;font-family:'Sora',sans-serif;font-size:0.9em;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.btn-red{background:linear-gradient(135deg,var(--accent),#ff6b6b);color:white;}
+.btn-red:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(233,69,96,0.4);}
+.btn-ol{background:transparent;border:1px solid var(--border);color:var(--text-dim);}
+.btn-ol:hover{border-color:var(--text);color:var(--text);}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;}
+@media(max-width:600px){.stats-row{grid-template-columns:repeat(2,1fr);}}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center;}
+.stat-card .val{font-size:2.2em;font-weight:800;letter-spacing:-1px;line-height:1;margin-bottom:6px;}
+.stat-card .lbl{font-size:0.7em;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);}
+.s-red .val{color:var(--accent);}.s-green .val{color:var(--green);}.s-yellow .val{color:var(--accent2);}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;margin-bottom:20px;}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--surface2);}
+th{padding:12px 8px;text-align:center;font-size:0.7em;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.8px;border-bottom:1px solid var(--border);white-space:nowrap;}
+th.nc{text-align:left;padding-left:20px;min-width:180px;position:sticky;left:0;background:var(--surface2);z-index:10;border-right:1px solid var(--border);}
+td{padding:10px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.04);font-size:0.85em;}
+td.ntd{text-align:left;padding-left:20px;font-weight:600;position:sticky;left:0;background:var(--surface);z-index:5;border-right:1px solid var(--border);}
+tbody tr:hover td{background:rgba(255,255,255,0.03);}
+tbody tr:hover td.ntd{background:rgba(255,255,255,0.05);}
+.th-we{color:rgba(245,166,35,0.7)!important;}.td-we{background:rgba(245,166,35,0.04);}
+.td-tod{background:rgba(0,212,170,0.08)!important;}.th-tod{color:var(--green)!important;}
+input[type="checkbox"]{width:18px;height:18px;cursor:pointer;accent-color:var(--accent);}
+.tc{background:rgba(233,69,96,0.08)!important;color:var(--accent);font-weight:700;font-size:1em!important;border-left:1px solid rgba(233,69,96,0.2)!important;}
+.mb{background:transparent;border:1px solid var(--border);color:var(--text-dim);width:20px;height:20px;border-radius:4px;cursor:pointer;font-size:0.65em;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;}
+.mb:hover{border-color:var(--green);color:var(--green);}.mb:disabled{opacity:0.2;cursor:not-allowed;}
+.nm{display:flex;align-items:center;gap:6px;}.mc{display:flex;flex-direction:column;gap:2px;}
+.ra{display:flex;gap:4px;justify-content:center;}
+.be,.bd{padding:4px 9px;border-radius:6px;cursor:pointer;font-size:0.75em;font-family:'Sora',sans-serif;font-weight:600;border:none;transition:all 0.2s;}
+.be{background:rgba(245,166,35,0.2);color:var(--accent2);}.be:hover{background:rgba(245,166,35,0.35);}
+.bd{background:rgba(233,69,96,0.15);color:var(--accent);}.bd:hover{background:rgba(233,69,96,0.3);}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
+@media(max-width:900px){.sg{grid-template-columns:1fr;}}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.sh{padding:16px 20px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:700;font-size:0.85em;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);}
+.st{width:100%;border-collapse:collapse;}
+.st td{padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:0.85em;}
+.st td:last-child{text-align:right;font-weight:700;color:var(--accent);}
+.st .tr td{background:rgba(233,69,96,0.08);font-size:0.9em;border-bottom:none;}
+.st .tr td:last-child{color:var(--green);font-size:1.1em;}
+.fi{padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85em;width:85px;}
+.fi:focus{outline:none;border-color:var(--green);}
+.fd{padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.75em;width:120px;}
+.fd:focus{outline:none;border-color:var(--green);}
+.bp{background:rgba(0,212,170,0.2);color:var(--green);padding:3px 9px;border-radius:100px;font-size:0.75em;font-weight:700;border:1px solid rgba(0,212,170,0.3);}
+.bu{background:rgba(233,69,96,0.15);color:var(--accent);padding:3px 9px;border-radius:100px;font-size:0.75em;font-weight:700;border:1px solid rgba(233,69,96,0.3);}
+.bpy{background:rgba(0,212,170,0.2);color:var(--green);border:none;padding:5px 10px;border-radius:6px;font-size:0.75em;font-weight:700;font-family:'Sora',sans-serif;cursor:pointer;transition:all 0.2s;}
+.bpy:hover{background:rgba(0,212,170,0.35);}
+.bpn{background:rgba(233,69,96,0.15);color:var(--accent);border:none;padding:5px 10px;border-radius:6px;font-size:0.75em;font-weight:700;font-family:'Sora',sans-serif;cursor:pointer;transition:all 0.2s;}
+.bpn:hover{background:rgba(233,69,96,0.3);}
+.ftr td{background:rgba(0,212,170,0.08)!important;font-weight:700;}
+@media(max-width:600px){
+.topbar{padding:0 16px;}.app-body{padding:16px;}
+.month-nav h2{font-size:1.2em;min-width:190px;}
+.controls-bar{flex-direction:column;}.controls-bar input[type="text"]{min-width:100%;}}
+</style>
 </head>
 <body>
+<div id="loadingScreen"><div class="spinner"></div><div style="color:var(--text-dim);font-size:0.9em;">Зареждане...</div></div>
 
-<div id="loadingScreen">
-    <div class="spinner"></div>
-    <div style="color:var(--text-dim);font-size:0.9em;">Зареждане...</div>
-</div>
-
-<div id="loginScreen">
-    <div class="login-card">
-        <div class="login-logo">
-            <div class="icon">📋</div>
-            <h1>Клуб Присъствие</h1>
-            <p>Влез в своя акаунт</p>
-        </div>
-        <div class="login-field">
-            <label>Потребителско име</label>
-            <select id="loginSelect"><option value="">-- Избери --</option></select>
-        </div>
-        <div class="login-field">
-            <label>Парола</label>
-            <input type="password" id="loginPassword" placeholder="••••••••"
-                   onkeydown="if(event.key==='Enter') doLogin()">
-        </div>
-        <button class="btn-login" id="loginBtn" onclick="doLogin()">🔐 Влез</button>
-        <div id="loginError"></div>
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="icon">📋</div>
+      <h1>Клуб Присъствие</h1>
+      <p>Управление на спортен клуб</p>
     </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Вход</div>
+      <div class="auth-tab" id="tabReg" onclick="switchTab('reg')">Регистрация</div>
+    </div>
+    <div id="loginForm">
+      <div class="auth-field"><label>Ime на клуба</label><input type="text" id="loginName" placeholder="Моят Клуб"></div>
+      <div class="auth-field"><label>Парола</label><input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn-auth" onclick="doLogin()">🔐 Влез</button>
+      <div class="auth-msg" id="loginMsg"></div>
+    </div>
+    <div id="regForm" style="display:none;">
+      <div class="auth-field"><label>Ime на клуба</label><input type="text" id="regName" placeholder="ФК Левски"></div>
+      <div class="auth-field"><label>Парола</label><input type="password" id="regPass" placeholder="Минимум 4 символа"></div>
+      <div class="auth-field"><label>Потвърди парола</label><input type="password" id="regPass2" placeholder="Повтори паролата" onkeydown="if(event.key==='Enter')doRegister()"></div>
+      <button class="btn-auth green" onclick="doRegister()">✅ Регистрирай клуб</button>
+      <div class="auth-msg" id="regMsg"></div>
+    </div>
+  </div>
 </div>
 
 <div id="appScreen">
-    <div class="topbar">
-        <div class="topbar-brand"><div class="dot"></div>Клуб Присъствие</div>
-        <div class="topbar-right">
-            <div class="user-chip">
-                <div class="user-avatar" id="userAvatar"></div>
-                <div>
-                    <div class="user-info-name" id="userNameDisplay"></div>
-                    <div class="user-info-role" id="userRoleDisplay"></div>
-                </div>
-            </div>
-            <button class="btn-out" onclick="doLogout()">Изход</button>
-        </div>
+  <div class="topbar">
+    <div class="topbar-brand"><div class="dot"></div><span id="topbarName">Клуб</span></div>
+    <div class="topbar-right">
+      <div class="user-chip">
+        <div class="user-avatar" id="uAvatar"></div>
+        <div><div class="user-info-name" id="uName"></div><div class="user-info-role" id="uRole"></div></div>
+      </div>
+      <button class="btn-out" onclick="doLogout()">Изход</button>
     </div>
-
-    <div class="app-body">
-
-        <div id="adminPanel" style="display:none;" class="admin-panel">
-            <h2>👑 Администраторски Панел</h2>
-            <div class="admin-grid">
-                <div class="admin-box">
-                    <h3>➕ Добави Треньор</h3>
-                    <div class="field-group"><label>Ime</label><input type="text" id="newTrainerName" placeholder="Петър Иванов"></div>
-                    <div class="field-group"><label>Потребителско ime</label><input type="text" id="newTrainerUsername" placeholder="petar"></div>
-                    <div class="field-group"><label>Парола</label><input type="password" id="newTrainerPass" placeholder="Минимум 4 символа"></div>
-                    <div id="addTrainerMsg"></div>
-                    <button class="btn-add-trainer" onclick="addTrainer()">➕ Добави треньор</button>
-                </div>
-                <div class="admin-box">
-                    <h3>🏃 Треньори в Клуба</h3>
-                    <div class="trainer-list" id="trainerList"><div style="color:var(--text-dim);font-size:0.85em;">Зареждане...</div></div>
-                </div>
-            </div>
-        </div>
-
-        <div id="viewBar" style="display:none;" class="view-bar">
-            <label>👁️ Преглед:</label>
-            <select id="viewSelect" onchange="switchView()">
-                <option value="__all__">Обобщен изглед (всички)</option>
-            </select>
-            <span class="viewing-badge" id="viewingBadge"></span>
-        </div>
-
-        <div class="month-nav">
-            <button class="btn-month" onclick="prevMonth()">◄</button>
-            <h2 id="monthLabel"></h2>
-            <button class="btn-month" onclick="nextMonth()">►</button>
-        </div>
-
-        <div class="controls-bar">
-            <input type="text" id="childName" placeholder="Ime на детето..." onkeydown="if(event.key==='Enter') addChild()">
-            <button class="btn-action btn-red" onclick="addChild()">➕ Добави дете</button>
-            <select id="sortOrder" onchange="changeSortOrder()">
-                <option value="custom">Ред на добавяне</option>
-                <option value="name-asc">По ime А→Я</option>
-                <option value="name-desc">По ime Я→А</option>
-            </select>
-            <button class="btn-action btn-outline" onclick="exportExcel()">📊 Excel</button>
-        </div>
-
-        <div class="stats-row">
-            <div class="stat-card stat-red"><div class="val" id="statChildren">0</div><div class="lbl">Деца</div></div>
-            <div class="stat-card"><div class="val" id="statDays">0</div><div class="lbl">Дни в месеца</div></div>
-            <div class="stat-card stat-green"><div class="val" id="statTraining">0</div><div class="lbl">Дни с тренировки</div></div>
-            <div class="stat-card stat-yellow"><div class="val" id="statAvg">0%</div><div class="lbl">Средно присъствие</div></div>
-        </div>
-
-        <div class="table-wrap">
-            <table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table>
-        </div>
-
-        <div class="section-grid">
-            <div class="section-card">
-                <div class="section-header">📊 Месечна Статистика</div>
-                <table class="sum-table"><tbody id="summaryBody"></tbody></table>
-            </div>
-            <div class="section-card">
-                <div class="section-header">💰 Такси за Месеца</div>
-                <table class="sum-table">
-                    <thead><tr>
-                        <td style="color:var(--text-dim);font-size:0.75em;padding:10px 20px;border-bottom:1px solid var(--border);">Дете</td>
-                        <td style="color:var(--text-dim);font-size:0.75em;text-align:right;padding:10px 20px;border-bottom:1px solid var(--border);">Сума / Дата / Статус</td>
-                    </tr></thead>
-                    <tbody id="feesBody"></tbody>
-                </table>
-            </div>
-        </div>
-
+  </div>
+  <div class="app-body">
+    <div id="superSec" style="display:none;">
+      <div class="section-title">🌐 Всички Клубове</div>
+      <div class="clubs-grid" id="clubsGrid"></div>
+      <div id="selClubView" style="display:none;">
+        <div style="height:1px;background:var(--border);margin-bottom:24px;"></div>
+        <div class="section-title" id="selClubTitle"></div>
+      </div>
     </div>
+    <div id="adminPanel" style="display:none;" class="admin-panel">
+      <h2>👑 Управление на Клуба</h2>
+      <div class="admin-grid">
+        <div class="admin-box">
+          <h3>➕ Добави Треньор</h3>
+          <div class="field-group"><label>Ime</label><input type="text" id="tName" placeholder="Петър Иванов"></div>
+          <div class="field-group"><label>Потребителско ime</label><input type="text" id="tUser" placeholder="petar"></div>
+          <div class="field-group"><label>Парола</label><input type="password" id="tPass" placeholder="Минимум 4 символа"></div>
+          <div id="addTrainerMsg"></div>
+          <button class="btn-add" onclick="addTrainer()">➕ Добави треньор</button>
+        </div>
+        <div class="admin-box">
+          <h3>🏃 Треньори в Клуба</h3>
+          <div class="trainer-list" id="trainerList"></div>
+        </div>
+      </div>
+    </div>
+    <div id="viewBar" style="display:none;" class="view-bar">
+      <label>👁️ Преглед:</label>
+      <select id="viewSel" onchange="switchView()"><option value="__all__">Обобщен изглед</option></select>
+      <span class="v-badge" id="vBadge"></span>
+    </div>
+    <div id="mainContent">
+      <div class="month-nav">
+        <button class="btn-m" onclick="prevMonth()">◄</button>
+        <h2 id="monthLabel"></h2>
+        <button class="btn-m" onclick="nextMonth()">►</button>
+      </div>
+      <div class="controls-bar">
+        <input type="text" id="childName" placeholder="Ime на детето..." onkeydown="if(event.key==='Enter')addChild()">
+        <button class="btn-a btn-red" onclick="addChild()">➕ Добави дете</button>
+        <select id="sortOrder" onchange="changeSortOrder()">
+          <option value="custom">Ред на добавяне</option>
+          <option value="name-asc">По ime А→Я</option>
+          <option value="name-desc">По ime Я→А</option>
+        </select>
+        <button class="btn-a btn-ol" onclick="exportExcel()">📊 Excel</button>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card s-red"><div class="val" id="stCh">0</div><div class="lbl">Деца</div></div>
+        <div class="stat-card"><div class="val" id="stDy">0</div><div class="lbl">Дни в месеца</div></div>
+        <div class="stat-card s-green"><div class="val" id="stTr">0</div><div class="lbl">Дни с тренировки</div></div>
+        <div class="stat-card s-yellow"><div class="val" id="stAv">0%</div><div class="lbl">Средно присъствие</div></div>
+      </div>
+      <div class="table-wrap"><table><thead id="tHead"></thead><tbody id="tBody"></tbody></table></div>
+      <div class="sg">
+        <div class="sc">
+          <div class="sh">📊 Месечна Статистика</div>
+          <table class="st"><tbody id="sumBody"></tbody></table>
+        </div>
+        <div class="sc">
+          <div class="sh">💰 Такси за Месеца</div>
+          <table class="st">
+            <thead><tr>
+              <td style="color:var(--text-dim);font-size:0.75em;padding:10px 20px;border-bottom:1px solid var(--border);">Дете</td>
+              <td style="color:var(--text-dim);font-size:0.75em;text-align:right;padding:10px 20px;border-bottom:1px solid var(--border);">Сума / Дата / Статус</td>
+            </tr></thead>
+            <tbody id="feesBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const firebaseConfig = {
-    apiKey: "AIzaSyC8bB9gg9tIHck_Qh_bVkAu7BO4YuWbiOg",
-    authDomain: "fund-16a21.firebaseapp.com",
-    databaseURL: "https://fund-16a21-default-rtdb.firebaseio.com",
-    projectId: "fund-16a21",
-    storageBucket: "fund-16a21.firebasestorage.app",
-    messagingSenderId: "510373145575",
-    appId: "1:510373145575:web:3a256a601c6b47ae43ab42"
+const FC = {
+  apiKey:"AIzaSyC8bB9gg9tIHck_Qh_bVkAu7BO4YuWbiOg",
+  authDomain:"fund-16a21.firebaseapp.com",
+  databaseURL:"https://fund-16a21-default-rtdb.firebaseio.com",
+  projectId:"fund-16a21",
+  storageBucket:"fund-16a21.firebasestorage.app",
+  messagingSenderId:"510373145575",
+  appId:"1:510373145575:web:3a256a601c6b47ae43ab42"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+// === СМЕНИ ТАЗИ ПАРОЛА ===
+const SA_PASS = 'superadmin2026';
+// =========================
 
-// ---- STATE ----
-let currentUser = null; // { id, name, role, username }
-let viewingId = '__all__';
-let currentMonth = new Date().getMonth();
-let currentYear = new Date().getFullYear();
-let trainerData = {};
-let allUsers = {};
-let unsubscribeData = null;
-const MONTHS = ['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември'];
+const db = getDatabase(initializeApp(FC));
+let sess=null, cUsers={}, tData={}, viewId='__all__', selCid=null, unsub=null;
+let cm=new Date().getMonth(), cy=new Date().getFullYear();
+const MN=['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември'];
 
-// ---- INIT: load users then show login ----
-async function init() {
-    try {
-        // Check if admin exists, if not create default admin
-        const snap = await get(ref(db, 'users'));
-        if (!snap.exists()) {
-            // Create default admin
-            await set(ref(db, 'users/admin'), {
-                name: 'Администратор',
-                username: 'admin',
-                password: 'admin1234',
-                role: 'admin'
-            });
-        }
-        allUsers = (await get(ref(db, 'users'))).val() || {};
-        populateLoginSelect();
-    } catch(e) {
-        document.getElementById('loadingScreen').innerHTML = `
-            <div style="color:var(--accent);text-align:center;padding:20px;">
-                <div style="font-size:2em;margin-bottom:16px;">⚠️</div>
-                <div>Грешка при свързване с базата данни.</div>
-                <div style="color:var(--text-dim);font-size:0.85em;margin-top:8px;">${e.message}</div>
-            </div>`;
-        return;
-    }
-    document.getElementById('loadingScreen').style.display = 'none';
-    document.getElementById('loginScreen').style.display = 'flex';
+async function init(){
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('authScreen').style.display='flex';
 }
 
-function populateLoginSelect() {
-    const sel = document.getElementById('loginSelect');
-    sel.innerHTML = '<option value="">-- Избери --</option>';
-    Object.entries(allUsers).forEach(([id, u]) => {
-        const o = document.createElement('option');
-        o.value = id;
-        o.textContent = u.role === 'admin' ? `👑 ${u.name}` : `🏃 ${u.name}`;
-        sel.appendChild(o);
+window.switchTab=function(t){
+  document.getElementById('loginForm').style.display=t==='login'?'block':'none';
+  document.getElementById('regForm').style.display=t==='reg'?'block':'none';
+  document.getElementById('tabLogin').className='auth-tab'+(t==='login'?' active':'');
+  document.getElementById('tabReg').className='auth-tab'+(t==='reg'?' active':'');
+}
+
+window.doLogin=async function(){
+  const name=document.getElementById('loginName').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const msg=document.getElementById('loginMsg');
+  msg.className='auth-msg error'; msg.textContent='';
+  if(!name||!pass){msg.textContent='❌ Попълни всички полета!';return;}
+
+  if(name.toLowerCase()==='superadmin'&&pass===SA_PASS){
+    sess={type:'superadmin'}; showApp(); return;
+  }
+
+  const snap=await get(ref(db,'clubs'));
+  if(!snap.exists()){msg.textContent='❌ Клубът не е намерен!';return;}
+  const clubs=snap.val();
+  const ce=Object.entries(clubs).find(([,c])=>c.name.toLowerCase()===name.toLowerCase());
+  if(!ce){msg.textContent='❌ Клубът не е намерен!';return;}
+  const [cid,club]=ce;
+
+  if(club.users){
+    const te=Object.entries(club.users).find(([,u])=>u.username.toLowerCase()===name.toLowerCase()&&u.password===pass);
+    if(te){sess={type:'trainer',cid,tid:te[0],cname:club.name};showApp();return;}
+  }
+  if(club.password!==pass){msg.textContent='❌ Грешна парола!';return;}
+  sess={type:'club',cid,cname:club.name}; showApp();
+}
+
+window.doRegister=async function(){
+  const name=document.getElementById('regName').value.trim();
+  const pass=document.getElementById('regPass').value;
+  const pass2=document.getElementById('regPass2').value;
+  const msg=document.getElementById('regMsg');
+  msg.className='auth-msg error'; msg.textContent='';
+  if(!name){msg.textContent='❌ Въведи ime на клуба!';return;}
+  if(pass.length<4){msg.textContent='❌ Паролата трябва да е поне 4 символа!';return;}
+  if(pass!==pass2){msg.textContent='❌ Паролите не съвпадат!';return;}
+
+  const snap=await get(ref(db,'clubs'));
+  if(snap.exists()){
+    const ex=Object.values(snap.val()).find(c=>c.name.toLowerCase()===name.toLowerCase());
+    if(ex){msg.textContent='❌ Клуб с това ime вече съществува!';return;}
+  }
+  const cid='club_'+Date.now();
+  await set(ref(db,`clubs/${cid}`),{name,password:pass,createdAt:Date.now(),users:{},trainerData:{}});
+  msg.className='auth-msg success';
+  msg.textContent=`✅ Клубът "${name}" е регистриран! Можеш да влезеш.`;
+  setTimeout(()=>{switchTab('login');document.getElementById('loginName').value=name;},2000);
+}
+
+window.doLogout=function(){
+  if(unsub){unsub();unsub=null;}
+  sess=null;cUsers={};tData={};viewId='__all__';selCid=null;
+  document.getElementById('appScreen').style.display='none';
+  document.getElementById('authScreen').style.display='flex';
+  document.getElementById('loginPass').value='';
+  document.getElementById('loginMsg').textContent='';
+}
+
+function showApp(){
+  document.getElementById('authScreen').style.display='none';
+  document.getElementById('appScreen').style.display='block';
+  updML();
+  const av=document.getElementById('uAvatar');
+
+  if(sess.type==='superadmin'){
+    av.textContent='S';av.className='user-avatar av-super';
+    document.getElementById('uName').textContent='Супер Админ';
+    document.getElementById('uRole').textContent='🌐 Всички клубове';
+    document.getElementById('topbarName').textContent='Клуб Присъствие';
+    document.getElementById('superSec').style.display='block';
+    document.getElementById('adminPanel').style.display='none';
+    document.getElementById('viewBar').style.display='none';
+    document.getElementById('mainContent').style.display='none';
+    loadSuperView();
+  } else if(sess.type==='club'){
+    av.textContent=sess.cname[0].toUpperCase();av.className='user-avatar av-admin';
+    document.getElementById('uName').textContent=sess.cname;
+    document.getElementById('uRole').textContent='👑 Администратор';
+    document.getElementById('topbarName').textContent=sess.cname;
+    document.getElementById('superSec').style.display='none';
+    document.getElementById('adminPanel').style.display='block';
+    document.getElementById('viewBar').style.display='flex';
+    document.getElementById('mainContent').style.display='block';
+    loadClubData();
+  } else {
+    av.className='user-avatar av-trainer';
+    document.getElementById('superSec').style.display='none';
+    document.getElementById('adminPanel').style.display='none';
+    document.getElementById('viewBar').style.display='none';
+    document.getElementById('mainContent').style.display='block';
+    document.getElementById('topbarName').textContent=sess.cname;
+    loadTrainerData();
+  }
+}
+
+async function loadSuperView(){
+  const grid=document.getElementById('clubsGrid');
+  grid.innerHTML='<div style="color:var(--text-dim);">Зареждане...</div>';
+  const snap=await get(ref(db,'clubs'));
+  grid.innerHTML='';
+  if(!snap.exists()){grid.innerHTML='<div style="color:var(--text-dim);">Няма клубове.</div>';return;}
+  const clubs=snap.val();
+  Object.entries(clubs).forEach(([id,club])=>{
+    const trainers=club.users?Object.keys(club.users).length:0;
+    const children=club.trainerData?Object.values(club.trainerData).reduce((s,d)=>s+(d.children?d.children.length:0),0):0;
+    const div=document.createElement('div');
+    div.className='club-card'+(selCid===id?' active':'');
+    div.innerHTML=`<div class="club-card-name">🏟️ ${club.name}</div><div class="club-card-stats"><div>Треньори: <span>${trainers}</span></div><div>Деца: <span>${children}</span></div></div>`;
+    div.onclick=(e)=>selClub(id,club.name,clubs,div);
+    grid.appendChild(div);
+  });
+}
+
+async function selClub(cid,cname,clubs,el){
+  selCid=cid;
+  document.querySelectorAll('.club-card').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('selClubView').style.display='block';
+  document.getElementById('selClubTitle').textContent=`📋 ${cname}`;
+  document.getElementById('mainContent').style.display='block';
+  document.getElementById('viewBar').style.display='flex';
+  const club=clubs[cid];
+  cUsers=club.users||{};
+  popViewSel(); viewId='__all__'; document.getElementById('viewSel').value='__all__';
+  updML(); renderAdminOverview(cid);
+}
+
+async function loadClubData(){
+  const snap=await get(ref(db,`clubs/${sess.cid}/users`));
+  cUsers=snap.exists()?snap.val():{};
+  renderAdminPanel(); popViewSel(); viewId='__all__'; renderAdminOverview(sess.cid);
+}
+
+function renderAdminPanel(){
+  const list=document.getElementById('trainerList'); list.innerHTML='';
+  const trainers=Object.entries(cUsers).filter(([,u])=>u.role==='trainer');
+  if(!trainers.length){list.innerHTML='<div style="color:var(--text-dim);font-size:0.85em;padding:10px 0;">Няма треньори.</div>';return;}
+  trainers.forEach(([id,t])=>{
+    const div=document.createElement('div'); div.className='trainer-row';
+    div.innerHTML=`<div style="display:flex;align-items:center;gap:10px;"><span>🏃</span><div><div class="t-name">${t.name}</div><div class="t-sub">@${t.username}</div></div></div><button class="btn-del-t" onclick="delTrainer('${id}','${t.name.replace(/'/g,"\\'")}')">🗑️</button>`;
+    list.appendChild(div);
+  });
+}
+
+function popViewSel(){
+  const sel=document.getElementById('viewSel');
+  sel.innerHTML='<option value="__all__">Обобщен изглед (всички)</option>';
+  Object.entries(cUsers).filter(([,u])=>u.role==='trainer').forEach(([id,t])=>{
+    const o=document.createElement('option'); o.value=id; o.textContent=`🏃 ${t.name}`; sel.appendChild(o);
+  });
+}
+
+window.addTrainer=async function(){
+  const name=document.getElementById('tName').value.trim();
+  const uname=document.getElementById('tUser').value.trim().toLowerCase();
+  const pass=document.getElementById('tPass').value;
+  const msg=document.getElementById('addTrainerMsg');
+  msg.style.color='var(--accent)';
+  if(!name){msg.textContent='❌ Въведи ime!';return;}
+  if(!uname){msg.textContent='❌ Въведи потребителско ime!';return;}
+  if(pass.length<4){msg.textContent='❌ Паролата трябва да е поне 4 символа!';return;}
+  if(cUsers[uname]){msg.textContent='❌ Потребителското ime вече съществува!';return;}
+  const cid=sess.cid;
+  const nu={name,username:uname,password:pass,role:'trainer'};
+  await set(ref(db,`clubs/${cid}/users/${uname}`),nu);
+  await set(ref(db,`clubs/${cid}/trainerData/${uname}`),{children:[],attendance:{},fees:{},sortOrder:'custom'});
+  cUsers[uname]=nu;
+  document.getElementById('tName').value=''; document.getElementById('tUser').value=''; document.getElementById('tPass').value='';
+  msg.style.color='var(--green)'; msg.textContent=`✅ ${name} е добавен!`;
+  setTimeout(()=>msg.textContent='',3000);
+  renderAdminPanel(); popViewSel();
+}
+
+window.delTrainer=async function(id,name){
+  if(!confirm(`Изтрий треньор "${name}"?`)) return;
+  const cid=sess.cid;
+  await remove(ref(db,`clubs/${cid}/users/${id}`));
+  await remove(ref(db,`clubs/${cid}/trainerData/${id}`));
+  delete cUsers[id];
+  if(viewId===id){viewId='__all__'; document.getElementById('vBadge').style.display='none';}
+  renderAdminPanel(); popViewSel(); renderAdminOverview(cid);
+}
+
+window.switchView=function(){
+  viewId=document.getElementById('viewSel').value;
+  const badge=document.getElementById('vBadge');
+  if(unsub){unsub();unsub=null;}
+  const cid=sess.type==='superadmin'?selCid:sess.cid;
+  if(viewId!=='__all__'){
+    badge.textContent=`👁️ ${cUsers[viewId].name}`; badge.style.display='inline-block';
+    subData(cid,viewId);
+  } else {
+    badge.style.display='none'; renderAdminOverview(cid);
+  }
+}
+
+async function loadTrainerData(){
+  const snap=await get(ref(db,`clubs/${sess.cid}/users/${sess.tid}`));
+  if(snap.exists()){
+    const u=snap.val();
+    document.getElementById('uName').textContent=u.name;
+    document.getElementById('uRole').textContent='🏃 Треньор';
+    document.getElementById('uAvatar').textContent=u.name[0].toUpperCase();
+  }
+  subData(sess.cid,sess.tid);
+}
+
+function subData(cid,tid){
+  if(unsub) unsub();
+  unsub=onValue(ref(db,`clubs/${cid}/trainerData/${tid}`),snap=>{
+    tData=snap.exists()?snap.val():{};
+    if(!tData.children) tData.children=[];
+    if(!tData.attendance) tData.attendance={};
+    if(!tData.fees) tData.fees={};
+    if(!tData.sortOrder) tData.sortOrder='custom';
+    renderTV();
+  });
+}
+
+async function save(){
+  const cid=sess.type==='superadmin'?selCid:sess.cid;
+  const tid=sess.type==='trainer'?sess.tid:viewId;
+  if(!cid||!tid||tid==='__all__') return;
+  await set(ref(db,`clubs/${cid}/trainerData/${tid}`),tData);
+}
+
+function updML(){document.getElementById('monthLabel').textContent=`${MN[cm]} ${cy}`;}
+window.prevMonth=function(){cm--;if(cm<0){cm=11;cy--;}updML();refresh();}
+window.nextMonth=function(){cm++;if(cm>11){cm=0;cy++;}updML();refresh();}
+function refresh(){const cid=sess.type==='superadmin'?selCid:sess.cid;if(viewId==='__all__')renderAdminOverview(cid);else renderTV();}
+
+function gDays(){
+  const last=new Date(cy,cm+1,0).getDate();
+  const ns=['Нд','Пн','Вт','Ср','Чт','Пт','Сб'],tod=new Date().toDateString(),days=[];
+  for(let d=1;d<=last;d++){
+    const dt=new Date(cy,cm,d),dow=dt.getDay();
+    days.push({n:d,name:ns[dow],full:`${cy}-${String(cm+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,we:dow===0||dow===6,tod:dt.toDateString()===tod});
+  }
+  return days;
+}
+
+function gSorted(){
+  const ch=[...tData.children];
+  if(tData.sortOrder==='name-asc') return ch.sort((a,b)=>a.localeCompare(b,'bg'));
+  if(tData.sortOrder==='name-desc') return ch.sort((a,b)=>b.localeCompare(a,'bg'));
+  return ch;
+}
+function cAtt(data,name,days){return days.filter(d=>data.attendance&&data.attendance[`${name}-${d.full}`]).length;}
+function fKey(n){return `${n}-${cy}-${cm}`;}
+function esc(n){return n.replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+
+window.addChild=async function(){
+  if(viewId==='__all__'){alert('Избери конкретен треньор!');return;}
+  const name=document.getElementById('childName').value.trim();
+  if(!name){alert('Въведи ime!');return;}
+  if(tData.children.includes(name)){alert('Детето вече е добавено!');return;}
+  tData.children.push(name); document.getElementById('childName').value=''; await save();
+}
+window.editChild=async function(old){
+  const n=(prompt('Промени imeto:',old)||'').trim();
+  if(!n||n===old) return;
+  if(tData.children.includes(n)){alert('Вече съществува!');return;}
+  tData.children[tData.children.indexOf(old)]=n;
+  const att={};
+  Object.keys(tData.attendance).forEach(k=>{att[k.startsWith(old+'-')?n+k.slice(old.length):k]=tData.attendance[k];});
+  tData.attendance=att; await save();
+}
+window.delChild=async function(name){
+  if(!confirm(`Изтрий ${name}?`)) return;
+  tData.children=tData.children.filter(c=>c!==name);
+  Object.keys(tData.attendance).forEach(k=>{if(k.startsWith(name+'-')) delete tData.attendance[k];});
+  await save();
+}
+window.togAtt=async function(name,date){
+  tData.attendance[`${name}-${date}`]=!tData.attendance[`${name}-${date}`]; await save();
+}
+window.mvUp=async function(name){
+  const i=tData.children.indexOf(name);
+  if(i>0){[tData.children[i-1],tData.children[i]]=[tData.children[i],tData.children[i-1]];await save();}
+}
+window.mvDn=async function(name){
+  const i=tData.children.indexOf(name);
+  if(i<tData.children.length-1){[tData.children[i],tData.children[i+1]]=[tData.children[i+1],tData.children[i]];await save();}
+}
+window.changeSortOrder=async function(){tData.sortOrder=document.getElementById('sortOrder').value;await save();}
+window.updFee=async function(name,field,val){
+  const k=fKey(name);
+  if(!tData.fees[k]) tData.fees[k]={amount:'',date:'',paid:false};
+  tData.fees[k][field]=val; await save(); renderFees();
+}
+window.togPaid=async function(name){
+  const k=fKey(name);
+  if(!tData.fees[k]) tData.fees[k]={amount:'',date:'',paid:false};
+  tData.fees[k].paid=!tData.fees[k].paid; await save(); renderFees();
+}
+window.clrFee=async function(name){
+  if(!confirm(`Изчисти таксата за ${name}?`)) return;
+  delete tData.fees[fKey(name)]; await save(); renderFees();
+}
+
+function renderTV(){
+  const days=gDays();
+  if(document.getElementById('sortOrder')) document.getElementById('sortOrder').value=tData.sortOrder||'custom';
+  renderTable(days); renderSum(days); renderFees(); renderStats(days);
+}
+
+function renderTable(days){
+  const thead=document.getElementById('tHead'),tbody=document.getElementById('tBody');
+  thead.innerHTML=''; tbody.innerHTML='';
+  const sorted=gSorted(),isC=tData.sortOrder==='custom';
+  let h=`<th class="nc">Дете</th>`;
+  days.forEach(d=>{h+=`<th class="${d.tod?'th-tod':''} ${d.we?'th-we':''}"><div style="font-size:0.8em;">${d.name}</div><div style="font-size:1.1em;font-weight:700;">${d.n}</div></th>`;});
+  h+=`<th class="tc" style="min-width:52px;">М</th><th style="min-width:80px;">—</th>`;
+  const hr=document.createElement('tr'); hr.innerHTML=h; thead.appendChild(hr);
+  sorted.forEach(name=>{
+    const oi=tData.children.indexOf(name),isF=oi===0,isL=oi===tData.children.length-1;
+    let nc=isC?`<div class="nm"><div class="mc"><button class="mb" onclick="mvUp('${esc(name)}');return false;" ${isF?'disabled':''}>▲</button><button class="mb" onclick="mvDn('${esc(name)}');return false;" ${isL?'disabled':''}>▼</button></div>${name}</div>`:name;
+    let row=`<td class="ntd">${nc}</td>`;
+    days.forEach(day=>{row+=`<td class="${day.tod?'td-tod':''} ${day.we?'td-we':''}"><input type="checkbox" ${tData.attendance[`${name}-${day.full}`]?'checked':''} onchange="togAtt('${esc(name)}','${day.full}')"></td>`;});
+    const mt=cAtt(tData,name,days);
+    row+=`<td class="tc">${mt}</td><td><div class="ra"><button class="be" onclick="editChild('${esc(name)}')">✏️</button><button class="bd" onclick="delChild('${esc(name)}')">🗑️</button></div></td>`;
+    const tr=document.createElement('tr'); tr.innerHTML=row; tbody.appendChild(tr);
+  });
+}
+
+function renderSum(days){
+  const body=document.getElementById('sumBody'); body.innerHTML=''; let total=0;
+  gSorted().forEach(name=>{
+    const att=cAtt(tData,name,days); total+=att;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td style="padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.04);">${name}</td><td style="text-align:right;padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.04);font-weight:700;color:var(--accent);">${att}</td>`;
+    body.appendChild(tr);
+  });
+  if(tData.children.length>0){
+    const tr=document.createElement('tr'); tr.className='tr';
+    tr.innerHTML=`<td style="padding:12px 20px;">ОБЩО:</td><td style="text-align:right;padding:12px 20px;">${total}</td>`;
+    body.appendChild(tr);
+  }
+}
+
+function renderFees(){
+  const body=document.getElementById('feesBody'); body.innerHTML=''; let col=0,pc=0;
+  gSorted().forEach(name=>{
+    const k=fKey(name),fee=tData.fees[k]||{amount:'',date:'',paid:false};
+    if(fee.amount&&fee.paid){col+=parseFloat(fee.amount)||0;pc++;}
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td style="padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <div style="font-weight:600;margin-bottom:8px;">${name}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <input type="number" class="fi" value="${fee.amount}" placeholder="0.00" step="0.01" min="0" onchange="updFee('${esc(name)}','amount',this.value)">
+          <input type="date" class="fd" value="${fee.date}" onchange="updFee('${esc(name)}','date',this.value)">
+        </div>
+      </td>
+      <td style="text-align:right;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <div style="margin-bottom:8px;">${fee.amount?(fee.paid?'<span class="bp">✓ Платена</span>':'<span class="bu">✗ Неплатена</span>'):'<span style="color:var(--text-dim);font-size:0.8em;">—</span>'}</div>
+        <div style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap;">
+          ${fee.amount?`<button class="${fee.paid?'bpn':'bpy'}" onclick="togPaid('${esc(name)}')">${fee.paid?'Отмаркирай':'Маркирай платена'}</button>`:''}
+          ${fee.amount?`<button class="bpn" onclick="clrFee('${esc(name)}')">Изчисти</button>`:''}
+        </div>
+      </td>`;
+    body.appendChild(tr);
+  });
+  if(tData.children.length>0){
+    const tr=document.createElement('tr'); tr.className='ftr';
+    tr.innerHTML=`<td style="padding:14px 20px;">💚 ОБЩО СЪБРАНО:</td><td style="text-align:right;padding:14px 20px;color:var(--green);font-size:1.1em;">${col.toFixed(2)} € <span style="color:var(--text-dim);font-size:0.75em;font-weight:400;">(${pc} деца)</span></td>`;
+    body.appendChild(tr);
+  }
+}
+
+function renderStats(days){
+  const total=tData.children.reduce((s,c)=>s+cAtt(tData,c,days),0);
+  const tdays=days.filter(day=>tData.children.some(c=>tData.attendance[`${c}-${day.full}`])).length;
+  const max=tData.children.length*days.length;
+  document.getElementById('stCh').textContent=tData.children.length;
+  document.getElementById('stDy').textContent=days.length;
+  document.getElementById('stTr').textContent=tdays;
+  document.getElementById('stAv').textContent=(max>0?((total/max)*100).toFixed(1):0)+'%';
+}
+
+async function renderAdminOverview(cid){
+  document.getElementById('tHead').innerHTML=`<tr><th class="nc" colspan="99" style="text-align:center;padding:20px;color:var(--text-dim);">Избери треньор от менюто по-горе</th></tr>`;
+  document.getElementById('tBody').innerHTML='';
+  const sb=document.getElementById('sumBody'),fb=document.getElementById('feesBody');
+  sb.innerHTML='<tr><td colspan="2" style="padding:16px 20px;color:var(--text-dim);">Зареждане...</td></tr>'; fb.innerHTML='';
+  const days=gDays();
+  const snap=await get(ref(db,`clubs/${cid}/trainerData`));
+  const allD=snap.exists()?snap.val():{};
+  sb.innerHTML=''; let totPaid=0;
+  const trainers=Object.entries(cUsers).filter(([,u])=>u.role==='trainer');
+  trainers.forEach(([id,t])=>{
+    const d=allD[id]||{children:[],attendance:{},fees:{}};
+    if(!d.children) d.children=[];
+    const tt=d.children.reduce((s,c)=>s+cAtt(d,c,days),0);
+    let tP=0;
+    d.children.forEach(c=>{const fee=d.fees&&d.fees[`${c}-${cy}-${cm}`];if(fee&&fee.amount&&fee.paid)tP+=parseFloat(fee.amount)||0;});
+    totPaid+=tP;
+    const sr=document.createElement('tr');
+    sr.innerHTML=`<td style="padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);"><strong style="color:var(--accent2);">🏃 ${t.name}</strong><span style="color:var(--text-dim);font-size:0.8em;margin-left:8px;">${d.children.length} деца</span></td><td style="text-align:right;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);font-weight:700;color:var(--accent);">${tt} тр.</td>`;
+    sb.appendChild(sr);
+    d.children.forEach(c=>{
+      const cr=document.createElement('tr');
+      cr.innerHTML=`<td style="padding:7px 20px 7px 36px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--text-dim);">↳ ${c}</td><td style="text-align:right;padding:7px 20px;border-bottom:1px solid rgba(255,255,255,0.03);">${cAtt(d,c,days)}</td>`;
+      sb.appendChild(cr);
     });
+    const fr=document.createElement('tr');
+    fr.innerHTML=`<td style="padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);"><strong style="color:var(--accent2);">🏃 ${t.name}</strong></td><td style="text-align:right;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:var(--green);font-weight:700;">${tP.toFixed(2)} €</span></td>`;
+    fb.appendChild(fr);
+  });
+  if(!trainers.length) sb.innerHTML='<tr><td colspan="2" style="padding:16px 20px;color:var(--text-dim);">Няма треньори.</td></tr>';
+  const tot=document.createElement('tr'); tot.className='ftr';
+  tot.innerHTML=`<td style="padding:14px 20px;">💰 ОБЩО СЪБРАНО:</td><td style="text-align:right;padding:14px 20px;color:var(--green);font-size:1.2em;">${totPaid.toFixed(2)} €</td>`;
+  fb.appendChild(tot);
+  const totCh=trainers.reduce((s,[id])=>s+((allD[id]&&allD[id].children)?allD[id].children.length:0),0);
+  document.getElementById('stCh').textContent=totCh;
+  document.getElementById('stDy').textContent=days.length;
+  document.getElementById('stTr').textContent='—';
+  document.getElementById('stAv').textContent='—';
 }
 
-// ---- LOGIN ----
-window.doLogin = function() {
-    const id = document.getElementById('loginSelect').value;
-    const pass = document.getElementById('loginPassword').value;
-    const err = document.getElementById('loginError');
-    err.textContent = '';
-    if (!id) { err.textContent = '❌ Избери акаунт!'; return; }
-    const user = allUsers[id];
-    if (!user || user.password !== pass) { err.textContent = '❌ Грешна парола!'; return; }
-    currentUser = { id, ...user };
-    document.getElementById('loginPassword').value = '';
-    showApp();
-}
-
-window.doLogout = function() {
-    if (unsubscribeData) { unsubscribeData(); unsubscribeData = null; }
-    currentUser = null; viewingId = '__all__'; trainerData = {};
-    document.getElementById('appScreen').style.display = 'none';
-    document.getElementById('loginScreen').style.display = 'flex';
-}
-
-// ---- SHOW APP ----
-function showApp() {
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('appScreen').style.display = 'block';
-    const isAdmin = currentUser.role === 'admin';
-    const av = document.getElementById('userAvatar');
-    av.textContent = currentUser.name[0].toUpperCase();
-    av.className = 'user-avatar ' + (isAdmin ? 'avatar-admin' : 'avatar-trainer');
-    document.getElementById('userNameDisplay').textContent = currentUser.name;
-    document.getElementById('userRoleDisplay').textContent = isAdmin ? '👑 Администратор' : '🏃 Треньор';
-    document.getElementById('adminPanel').style.display = isAdmin ? 'block' : 'none';
-    document.getElementById('viewBar').style.display = isAdmin ? 'flex' : 'none';
-    updateMonthLabel();
-    if (isAdmin) {
-        renderAdminPanel();
-        populateViewSelect();
-        viewingId = '__all__';
-        renderAdminOverview();
-    } else {
-        viewingId = currentUser.id;
-        subscribeToData(currentUser.id);
-    }
-}
-
-// ---- ADMIN ----
-function renderAdminPanel() {
-    const list = document.getElementById('trainerList');
-    list.innerHTML = '';
-    const trainers = Object.entries(allUsers).filter(([,u]) => u.role === 'trainer');
-    if (!trainers.length) {
-        list.innerHTML = '<div style="color:var(--text-dim);font-size:0.85em;padding:10px 0;">Няма добавени треньори.</div>';
-        return;
-    }
-    trainers.forEach(([id, t]) => {
-        const div = document.createElement('div');
-        div.className = 'trainer-row';
-        div.innerHTML = `
-            <div style="display:flex;align-items:center;gap:10px;">
-                <span style="font-size:1.2em;">🏃</span>
-                <div>
-                    <div class="trainer-row-name">${t.name}</div>
-                    <div class="trainer-row-sub">@${t.username}</div>
-                </div>
-            </div>
-            <button class="btn-del-trainer" onclick="deleteTrainer('${id}','${t.name.replace(/'/g,"\\'")}')">🗑️</button>`;
-        list.appendChild(div);
-    });
-}
-
-function populateViewSelect() {
-    const sel = document.getElementById('viewSelect');
-    sel.innerHTML = '<option value="__all__">Обобщен изглед (всички)</option>';
-    Object.entries(allUsers).filter(([,u]) => u.role === 'trainer').forEach(([id, t]) => {
-        const o = document.createElement('option');
-        o.value = id; o.textContent = `🏃 ${t.name}`; sel.appendChild(o);
-    });
-    sel.value = viewingId;
-}
-
-window.addTrainer = async function() {
-    const name = document.getElementById('newTrainerName').value.trim();
-    const username = document.getElementById('newTrainerUsername').value.trim().toLowerCase();
-    const pass = document.getElementById('newTrainerPass').value;
-    const msg = document.getElementById('addTrainerMsg');
-    msg.style.color = 'var(--accent)';
-    if (!name) { msg.textContent = '❌ Въведи ime!'; return; }
-    if (!username) { msg.textContent = '❌ Въведи потребителско ime!'; return; }
-    if (pass.length < 4) { msg.textContent = '❌ Паролата трябва да е поне 4 символа!'; return; }
-    if (allUsers[username]) { msg.textContent = '❌ Това потребителско ime вече съществува!'; return; }
-
-    const newUser = { name, username, password: pass, role: 'trainer' };
-    await set(ref(db, `users/${username}`), newUser);
-    await set(ref(db, `trainerData/${username}`), { children: [], attendance: {}, fees: {}, sortOrder: 'custom' });
-
-    allUsers[username] = newUser;
-    document.getElementById('newTrainerName').value = '';
-    document.getElementById('newTrainerUsername').value = '';
-    document.getElementById('newTrainerPass').value = '';
-    msg.style.color = 'var(--green)';
-    msg.textContent = `✅ ${name} е добавен успешно!`;
-    setTimeout(() => msg.textContent = '', 3000);
-    renderAdminPanel();
-    populateViewSelect();
-    populateLoginSelect();
-}
-
-window.deleteTrainer = async function(id, name) {
-    if (!confirm(`Изтрий треньор "${name}"?\n\nВсички данни ще бъдат изтрити!`)) return;
-    await remove(ref(db, `users/${id}`));
-    await remove(ref(db, `trainerData/${id}`));
-    delete allUsers[id];
-    if (viewingId === id) { viewingId = '__all__'; document.getElementById('viewingBadge').style.display = 'none'; }
-    renderAdminPanel();
-    populateViewSelect();
-    populateLoginSelect();
-    renderAdminOverview();
-}
-
-window.switchView = function() {
-    viewingId = document.getElementById('viewSelect').value;
-    const badge = document.getElementById('viewingBadge');
-    if (unsubscribeData) { unsubscribeData(); unsubscribeData = null; }
-    if (viewingId !== '__all__') {
-        badge.textContent = `👁️ ${allUsers[viewingId].name}`;
-        badge.style.display = 'inline-block';
-        subscribeToData(viewingId);
-    } else {
-        badge.style.display = 'none';
-        renderAdminOverview();
-    }
-}
-
-// ---- DATA ----
-function subscribeToData(uid) {
-    if (unsubscribeData) unsubscribeData();
-    unsubscribeData = onValue(ref(db, `trainerData/${uid}`), (snap) => {
-        trainerData = snap.exists() ? snap.val() : {};
-        if (!trainerData.children) trainerData.children = [];
-        if (!trainerData.attendance) trainerData.attendance = {};
-        if (!trainerData.fees) trainerData.fees = {};
-        if (!trainerData.sortOrder) trainerData.sortOrder = 'custom';
-        renderTrainerView();
-    });
-}
-
-async function saveData() {
-    const uid = currentUser.role === 'admin' ? viewingId : currentUser.id;
-    if (!uid || uid === '__all__') return;
-    await set(ref(db, `trainerData/${uid}`), trainerData);
-}
-
-// ---- MONTH ----
-function updateMonthLabel() { document.getElementById('monthLabel').textContent = `${MONTHS[currentMonth]} ${currentYear}`; }
-window.prevMonth = function() { currentMonth--; if(currentMonth<0){currentMonth=11;currentYear--;} updateMonthLabel(); if(viewingId==='__all__') renderAdminOverview(); else renderTrainerView(); }
-window.nextMonth = function() { currentMonth++; if(currentMonth>11){currentMonth=0;currentYear++;} updateMonthLabel(); if(viewingId==='__all__') renderAdminOverview(); else renderTrainerView(); }
-
-function getMonthDays() {
-    const last = new Date(currentYear,currentMonth+1,0).getDate();
-    const names=['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
-    const today=new Date().toDateString();
-    const days=[];
-    for(let d=1;d<=last;d++){
-        const dt=new Date(currentYear,currentMonth,d);
-        const dow=dt.getDay();
-        days.push({n:d,name:names[dow],full:`${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,weekend:dow===0||dow===6,today:dt.toDateString()===today});
-    }
-    return days;
-}
-
-function getSorted() {
-    const ch=[...trainerData.children];
-    if(trainerData.sortOrder==='name-asc') return ch.sort((a,b)=>a.localeCompare(b,'bg'));
-    if(trainerData.sortOrder==='name-desc') return ch.sort((a,b)=>b.localeCompare(a,'bg'));
-    return ch;
-}
-function countAtt(data,name,days){ return days.filter(d=>data.attendance&&data.attendance[`${name}-${d.full}`]).length; }
-function feeKey(name){ return `${name}-${currentYear}-${currentMonth}`; }
-function s(name){ return name.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
-
-// ---- CHILDREN ----
-window.addChild = async function() {
-    if(viewingId==='__all__'){alert('Избери конкретен треньор!');return;}
-    const name=document.getElementById('childName').value.trim();
-    if(!name){alert('Въведи ime!');return;}
-    if(trainerData.children.includes(name)){alert('Детето вече е добавено!');return;}
-    trainerData.children.push(name);
-    document.getElementById('childName').value='';
-    await saveData();
-}
-window.editChild = async function(oldName) {
-    const n=(prompt('Промени imeto:',oldName)||'').trim();
-    if(!n||n===oldName) return;
-    if(trainerData.children.includes(n)){alert('Вече съществува!');return;}
-    trainerData.children[trainerData.children.indexOf(oldName)]=n;
-    const att={};
-    Object.keys(trainerData.attendance).forEach(k=>{att[k.startsWith(oldName+'-')?n+k.slice(oldName.length):k]=trainerData.attendance[k];});
-    trainerData.attendance=att;
-    await saveData();
-}
-window.deleteChild = async function(name) {
-    if(!confirm(`Изтрий ${name}?`)) return;
-    trainerData.children=trainerData.children.filter(c=>c!==name);
-    Object.keys(trainerData.attendance).forEach(k=>{if(k.startsWith(name+'-')) delete trainerData.attendance[k];});
-    await saveData();
-}
-window.toggleAttendance = async function(name,date) {
-    const k=`${name}-${date}`;
-    trainerData.attendance[k]=!trainerData.attendance[k];
-    await saveData();
-}
-window.moveUp = async function(name) {
-    const i=trainerData.children.indexOf(name);
-    if(i>0){[trainerData.children[i-1],trainerData.children[i]]=[trainerData.children[i],trainerData.children[i-1]];await saveData();}
-}
-window.moveDown = async function(name) {
-    const i=trainerData.children.indexOf(name);
-    if(i<trainerData.children.length-1){[trainerData.children[i],trainerData.children[i+1]]=[trainerData.children[i+1],trainerData.children[i]];await saveData();}
-}
-window.changeSortOrder = async function() {
-    trainerData.sortOrder=document.getElementById('sortOrder').value;
-    await saveData();
-}
-
-// ---- FEES ----
-window.updateFee = async function(name,field,val) {
-    const k=feeKey(name);
-    if(!trainerData.fees[k]) trainerData.fees[k]={amount:'',date:'',paid:false};
-    trainerData.fees[k][field]=val;
-    await saveData(); renderFeesTable();
-}
-window.togglePaid = async function(name) {
-    const k=feeKey(name);
-    if(!trainerData.fees[k]) trainerData.fees[k]={amount:'',date:'',paid:false};
-    trainerData.fees[k].paid=!trainerData.fees[k].paid;
-    await saveData(); renderFeesTable();
-}
-window.clearFee = async function(name) {
-    if(!confirm(`Изчисти таксата за ${name}?`)) return;
-    delete trainerData.fees[feeKey(name)];
-    await saveData(); renderFeesTable();
-}
-
-// ---- RENDER ----
-function renderTrainerView() {
-    const days=getMonthDays();
-    if(document.getElementById('sortOrder')) document.getElementById('sortOrder').value=trainerData.sortOrder||'custom';
-    renderTable(days); renderSummary(days); renderFeesTable(); renderStats(days);
-}
-
-function renderTable(days) {
-    const thead=document.getElementById('tableHead');
-    const tbody=document.getElementById('tableBody');
-    thead.innerHTML=''; tbody.innerHTML='';
-    const sorted=getSorted();
-    const isCustom=trainerData.sortOrder==='custom';
-    let hHTML=`<th class="name-col">Дете</th>`;
-    days.forEach(d=>{hHTML+=`<th class="${d.today?'th-today':''} ${d.weekend?'th-weekend':''}"><div style="font-size:0.8em;">${d.name}</div><div style="font-size:1.1em;font-weight:700;">${d.n}</div></th>`;});
-    hHTML+=`<th class="total-col" style="min-width:52px;">М</th><th style="min-width:80px;">—</th>`;
-    const hr=document.createElement('tr'); hr.innerHTML=hHTML; thead.appendChild(hr);
-    sorted.forEach(name=>{
-        const origIdx=trainerData.children.indexOf(name);
-        const isFirst=origIdx===0,isLast=origIdx===trainerData.children.length-1;
-        let nameCell=isCustom?`<div class="name-moves"><div class="moves-col">
-            <button class="move-btn" onclick="moveUp('${s(name)}');return false;" ${isFirst?'disabled':''}>▲</button>
-            <button class="move-btn" onclick="moveDown('${s(name)}');return false;" ${isLast?'disabled':''}>▼</button>
-            </div>${name}</div>`:name;
-        let row=`<td class="name-td">${nameCell}</td>`;
-        days.forEach(day=>{
-            const k=`${name}-${day.full}`;
-            row+=`<td class="${day.today?'td-today':''} ${day.weekend?'td-weekend':''}"><input type="checkbox" ${trainerData.attendance[k]?'checked':''} onchange="toggleAttendance('${s(name)}','${day.full}')"></td>`;
-        });
-        const mt=countAtt(trainerData,name,days);
-        row+=`<td class="total-col">${mt}</td><td><div class="row-actions"><button class="btn-edit" onclick="editChild('${s(name)}')">✏️</button><button class="btn-del" onclick="deleteChild('${s(name)}')">🗑️</button></div></td>`;
-        const tr=document.createElement('tr'); tr.innerHTML=row; tbody.appendChild(tr);
-    });
-}
-
-function renderSummary(days) {
-    const body=document.getElementById('summaryBody'); body.innerHTML='';
-    let total=0;
-    getSorted().forEach(name=>{
-        const att=countAtt(trainerData,name,days); total+=att;
-        const tr=document.createElement('tr');
-        tr.innerHTML=`<td style="padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.04);">${name}</td><td style="text-align:right;padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.04);font-weight:700;color:var(--accent);">${att}</td>`;
-        body.appendChild(tr);
-    });
-    if(trainerData.children.length>0){
-        const tr=document.createElement('tr'); tr.className='total-sum-row';
-        tr.innerHTML=`<td style="padding:12px 20px;">ОБЩО:</td><td style="text-align:right;padding:12px 20px;">${total}</td>`;
-        body.appendChild(tr);
-    }
-}
-
-function renderFeesTable() {
-    const body=document.getElementById('feesBody'); body.innerHTML='';
-    let collected=0,paidCount=0;
-    getSorted().forEach(name=>{
-        const k=feeKey(name);
-        const fee=trainerData.fees[k]||{amount:'',date:'',paid:false};
-        if(fee.amount&&fee.paid){collected+=parseFloat(fee.amount)||0;paidCount++;}
-        const tr=document.createElement('tr');
-        tr.innerHTML=`
-            <td style="padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);">
-                <div style="font-weight:600;margin-bottom:8px;">${name}</div>
-                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                    <input type="number" class="fee-input" value="${fee.amount}" placeholder="0.00" step="0.01" min="0" onchange="updateFee('${s(name)}','amount',this.value)">
-                    <input type="date" class="fee-date" value="${fee.date}" onchange="updateFee('${s(name)}','date',this.value)">
-                </div>
-            </td>
-            <td style="text-align:right;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);">
-                <div style="margin-bottom:8px;">${fee.amount?(fee.paid?'<span class="badge-paid">✓ Платена</span>':'<span class="badge-unpaid">✗ Неплатена</span>'):'<span style="color:var(--text-dim);font-size:0.8em;">—</span>'}</div>
-                <div style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap;">
-                    ${fee.amount?`<button class="btn-pay ${fee.paid?'btn-pay-no':'btn-pay-yes'}" onclick="togglePaid('${s(name)}')">${fee.paid?'Отмаркирай':'Маркирай платена'}</button>`:''}
-                    ${fee.amount?`<button class="btn-pay btn-pay-no" onclick="clearFee('${s(name)}')">Изчисти</button>`:''}
-                </div>
-            </td>`;
-        body.appendChild(tr);
-    });
-    if(trainerData.children.length>0){
-        const tr=document.createElement('tr'); tr.className='fee-total-row';
-        tr.innerHTML=`<td style="padding:14px 20px;">💚 ОБЩО СЪБРАНО:</td><td style="text-align:right;padding:14px 20px;color:var(--green);font-size:1.1em;">${collected.toFixed(2)} € <span style="color:var(--text-dim);font-size:0.75em;font-weight:400;">(${paidCount} деца)</span></td>`;
-        body.appendChild(tr);
-    }
-}
-
-function renderStats(days) {
-    const total=trainerData.children.reduce((s,c)=>s+countAtt(trainerData,c,days),0);
-    const trainingDays=days.filter(day=>trainerData.children.some(c=>trainerData.attendance[`${c}-${day.full}`])).length;
-    const max=trainerData.children.length*days.length;
-    const avg=max>0?((total/max)*100).toFixed(1):0;
-    document.getElementById('statChildren').textContent=trainerData.children.length;
-    document.getElementById('statDays').textContent=days.length;
-    document.getElementById('statTraining').textContent=trainingDays;
-    document.getElementById('statAvg').textContent=avg+'%';
-}
-
-async function renderAdminOverview() {
-    document.getElementById('tableHead').innerHTML=`<tr><th class="name-col" colspan="99" style="text-align:center;padding:20px;color:var(--text-dim);">Избери треньор от менюто по-горе за детайлен преглед</th></tr>`;
-    document.getElementById('tableBody').innerHTML='';
-    const summaryBody=document.getElementById('summaryBody');
-    const feesBody=document.getElementById('feesBody');
-    summaryBody.innerHTML='<tr><td colspan="2" style="padding:16px 20px;color:var(--text-dim);">Зареждане...</td></tr>';
-    feesBody.innerHTML='';
-    const days=getMonthDays();
-    const snap=await get(ref(db,'trainerData'));
-    const allData=snap.exists()?snap.val():{};
-    summaryBody.innerHTML='';
-    let totalPaid=0;
-    const trainers=Object.entries(allUsers).filter(([,u])=>u.role==='trainer');
-    trainers.forEach(([id,t])=>{
-        const d=allData[id]||{children:[],attendance:{},fees:{}};
-        if(!d.children) d.children=[];
-        const trainerTotal=d.children.reduce((s,c)=>s+countAtt(d,c,days),0);
-        let tPaid=0;
-        d.children.forEach(c=>{const fee=d.fees&&d.fees[`${c}-${currentYear}-${currentMonth}`];if(fee&&fee.amount&&fee.paid)tPaid+=parseFloat(fee.amount)||0;});
-        totalPaid+=tPaid;
-        const sr=document.createElement('tr');
-        sr.innerHTML=`<td style="padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);"><strong style="color:var(--accent2);">🏃 ${t.name}</strong><span style="color:var(--text-dim);font-size:0.8em;margin-left:8px;">${d.children.length} деца</span></td><td style="text-align:right;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);font-weight:700;color:var(--accent);">${trainerTotal} тр.</td>`;
-        summaryBody.appendChild(sr);
-        d.children.forEach(c=>{
-            const cr=document.createElement('tr');
-            cr.innerHTML=`<td style="padding:7px 20px 7px 36px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--text-dim);">↳ ${c}</td><td style="text-align:right;padding:7px 20px;border-bottom:1px solid rgba(255,255,255,0.03);">${countAtt(d,c,days)}</td>`;
-            summaryBody.appendChild(cr);
-        });
-        const fr=document.createElement('tr');
-        fr.innerHTML=`<td style="padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);"><strong style="color:var(--accent2);">🏃 ${t.name}</strong></td><td style="text-align:right;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:var(--green);font-weight:700;">${tPaid.toFixed(2)} €</span><span style="color:var(--text-dim);font-size:0.8em;"> събрано</span></td>`;
-        feesBody.appendChild(fr);
-    });
-    if(!trainers.length) summaryBody.innerHTML='<tr><td colspan="2" style="padding:16px 20px;color:var(--text-dim);">Няма треньори.</td></tr>';
-    const totRow=document.createElement('tr'); totRow.className='fee-total-row';
-    totRow.innerHTML=`<td style="padding:14px 20px;">💰 ОБЩО СЪБРАНО:</td><td style="text-align:right;padding:14px 20px;color:var(--green);font-size:1.2em;">${totalPaid.toFixed(2)} €</td>`;
-    feesBody.appendChild(totRow);
-    document.getElementById('statChildren').textContent=trainers.reduce((s,[id])=>s+((allData[id]&&allData[id].children)?allData[id].children.length:0),0);
-    document.getElementById('statDays').textContent=days.length;
-    document.getElementById('statTraining').textContent='—';
-    document.getElementById('statAvg').textContent='—';
-}
-
-// ---- EXCEL ----
-window.exportExcel = function() {
-    if(viewingId==='__all__'){alert('Избери конкретен треньор!');return;}
-    if(!trainerData.children||!trainerData.children.length){alert('Няма данни!');return;}
-    const days=getMonthDays();
-    const rows=[[`Присъствие — ${MONTHS[currentMonth]} ${currentYear}`],[],['Дете',...days.map(d=>`${d.name} ${d.n}`),'ОБЩО']];
-    trainerData.children.forEach(c=>{rows.push([c,...days.map(d=>trainerData.attendance[`${c}-${d.full}`]?'Да':''),countAtt(trainerData,c,days)]);});
-    const fRows=[[`Такси — ${MONTHS[currentMonth]} ${currentYear}`],[],['Дете','Сума (€)','Дата','Статус']];
-    let tp=0;
-    trainerData.children.forEach(c=>{const f=trainerData.fees[feeKey(c)];if(f&&f.amount){fRows.push([c,f.amount,f.date||'',f.paid?'Платена':'Неплатена']);if(f.paid)tp+=parseFloat(f.amount)||0;}});
-    fRows.push([],['ОБЩО СЪБРАНО:',`${tp.toFixed(2)} €`]);
-    const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Присъствие');
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(fRows),'Такси');
-    XLSX.writeFile(wb,`Присъствие_${MONTHS[currentMonth]}_${currentYear}.xlsx`);
+window.exportExcel=function(){
+  if(viewId==='__all__'){alert('Избери конкретен треньор!');return;}
+  if(!tData.children||!tData.children.length){alert('Няма данни!');return;}
+  const days=gDays();
+  const rows=[[`Присъствие — ${MN[cm]} ${cy}`],[],['Дете',...days.map(d=>`${d.name} ${d.n}`),'ОБЩО']];
+  tData.children.forEach(c=>{rows.push([c,...days.map(d=>tData.attendance[`${c}-${d.full}`]?'Да':''),cAtt(tData,c,days)]);});
+  const fRows=[[`Такси — ${MN[cm]} ${cy}`],[],['Дете','Сума (€)','Дата','Статус']];
+  let tp=0;
+  tData.children.forEach(c=>{const f=tData.fees[fKey(c)];if(f&&f.amount){fRows.push([c,f.amount,f.date||'',f.paid?'Платена':'Неплатена']);if(f.paid)tp+=parseFloat(f.amount)||0;}});
+  fRows.push([],['ОБЩО СЪБРАНО:',`${tp.toFixed(2)} €`]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Присъствие');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(fRows),'Такси');
+  XLSX.writeFile(wb,`Присъствие_${MN[cm]}_${cy}.xlsx`);
 }
 
 init();
