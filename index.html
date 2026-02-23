@@ -162,8 +162,13 @@ input[type="checkbox"]{width:18px;height:18px;cursor:pointer;accent-color:var(--
       <div class="auth-tab" id="tabReg" onclick="switchTab('reg')">Регистрация</div>
     </div>
     <div id="loginForm">
-      <div class="auth-field"><label>Ime на клуба</label><input type="text" id="loginName" placeholder="Моят Клуб"></div>
+      <div class="auth-field"><label>Ime на клуба</label><input type="text" id="loginClub" placeholder="Моят Клуб"></div>
+      <div class="auth-field" id="trainerUserField" style="display:none;"><label>Потребителско ime (само за треньори)</label><input type="text" id="loginUser" placeholder="petar"></div>
       <div class="auth-field"><label>Парола</label><input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div style="margin-bottom:14px;display:flex;gap:8px;align-items:center;">
+        <input type="checkbox" id="isTrainer" onchange="toggleTrainerField()" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;">
+        <label for="isTrainer" style="font-size:0.85em;color:var(--text-dim);cursor:pointer;">Влизам като треньор</label>
+      </div>
       <button class="btn-auth" onclick="doLogin()">🔐 Влез</button>
       <div class="auth-msg" id="loginMsg"></div>
     </div>
@@ -297,28 +302,43 @@ window.switchTab=function(t){
   document.getElementById('tabReg').className='auth-tab'+(t==='reg'?' active':'');
 }
 
+window.toggleTrainerField=function(){
+  const isT=document.getElementById('isTrainer').checked;
+  document.getElementById('trainerUserField').style.display=isT?'block':'none';
+}
+
 window.doLogin=async function(){
-  const name=document.getElementById('loginName').value.trim();
+  const clubName=document.getElementById('loginClub').value.trim();
   const pass=document.getElementById('loginPass').value;
+  const isTrainer=document.getElementById('isTrainer').checked;
+  const username=document.getElementById('loginUser').value.trim().toLowerCase();
   const msg=document.getElementById('loginMsg');
   msg.className='auth-msg error'; msg.textContent='';
-  if(!name||!pass){msg.textContent='❌ Попълни всички полета!';return;}
+  if(!clubName||!pass){msg.textContent='❌ Попълни всички полета!';return;}
+  if(isTrainer&&!username){msg.textContent='❌ Въведи потребителско ime!';return;}
 
-  if(name.toLowerCase()==='superadmin'&&pass===SA_PASS){
+  // Superadmin
+  if(clubName.toLowerCase()==='superadmin'&&pass===SA_PASS){
     sess={type:'superadmin'}; showApp(); return;
   }
 
+  // Find club
   const snap=await get(ref(db,'clubs'));
   if(!snap.exists()){msg.textContent='❌ Клубът не е намерен!';return;}
   const clubs=snap.val();
-  const ce=Object.entries(clubs).find(([,c])=>c.name.toLowerCase()===name.toLowerCase());
+  const ce=Object.entries(clubs).find(([,c])=>c.name.toLowerCase()===clubName.toLowerCase());
   if(!ce){msg.textContent='❌ Клубът не е намерен!';return;}
   const [cid,club]=ce;
 
-  if(club.users){
-    const te=Object.entries(club.users).find(([,u])=>u.username.toLowerCase()===name.toLowerCase()&&u.password===pass);
-    if(te){sess={type:'trainer',cid,tid:te[0],cname:club.name};showApp();return;}
+  // Trainer login
+  if(isTrainer){
+    if(!club.users){msg.textContent='❌ Няма треньори в този клуб!';return;}
+    const te=Object.entries(club.users).find(([,u])=>u.username.toLowerCase()===username&&u.password===pass);
+    if(!te){msg.textContent='❌ Грешно потребителско ime или парола!';return;}
+    sess={type:'trainer',cid,tid:te[0],cname:club.name}; showApp(); return;
   }
+
+  // Club admin login
   if(club.password!==pass){msg.textContent='❌ Грешна парола!';return;}
   sess={type:'club',cid,cname:club.name}; showApp();
 }
@@ -351,6 +371,10 @@ window.doLogout=function(){
   document.getElementById('appScreen').style.display='none';
   document.getElementById('authScreen').style.display='flex';
   document.getElementById('loginPass').value='';
+  document.getElementById('loginClub').value='';
+  document.getElementById('loginUser').value='';
+  document.getElementById('isTrainer').checked=false;
+  document.getElementById('trainerUserField').style.display='none';
   document.getElementById('loginMsg').textContent='';
 }
 
