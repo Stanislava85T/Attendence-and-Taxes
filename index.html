@@ -290,7 +290,7 @@ const FC = {
 };
 
 // === СМЕНИ ТАЗИ ПАРОЛА ===
-const SA_PASS = 'superadmin2026';
+const SA_PASS = 'superadmin2024';
 // =========================
 
 const db = getDatabase(initializeApp(FC));
@@ -525,6 +525,7 @@ window.switchView=function(){
 }
 
 async function loadTrainerData(){
+  viewId=sess.tid;
   const snap=await get(ref(db,`clubs/${sess.cid}/users/${sess.tid}`));
   if(snap.exists()){
     const u=snap.val();
