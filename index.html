@@ -177,6 +177,10 @@ input[type="checkbox"]{width:18px;height:18px;cursor:pointer;accent-color:var(--
         <input type="checkbox" id="isTrainer" onchange="toggleTrainerField()" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;">
         <label for="isTrainer" style="font-size:0.85em;color:var(--text-dim);cursor:pointer;">Влизам като треньор</label>
       </div>
+      <div style="margin-bottom:14px;display:flex;gap:8px;align-items:center;">
+        <input type="checkbox" id="rememberMe" style="width:18px;height:18px;accent-color:var(--green);cursor:pointer;">
+        <label for="rememberMe" style="font-size:0.85em;color:var(--text-dim);cursor:pointer;">Запомни ме</label>
+      </div>
       <button class="btn-auth" onclick="doLogin()">🔐 Влез</button>
       <div class="auth-msg" id="loginMsg"></div>
     </div>
@@ -290,7 +294,7 @@ const FC = {
 };
 
 // === СМЕНИ ТАЗИ ПАРОЛА ===
-const SA_PASS = 'superadmin2024';
+const SA_PASS = 'superadmin2026';
 // =========================
 
 const db = getDatabase(initializeApp(FC));
@@ -299,6 +303,22 @@ let cm=new Date().getMonth(), cy=new Date().getFullYear();
 const MN=['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември'];
 
 async function init(){
+  const saved = localStorage.getItem('klubSess') || sessionStorage.getItem('klubSess');
+  if(saved){
+    try {
+      const parsed = JSON.parse(saved);
+      if(parsed && parsed.type){
+        if(parsed.type==='superadmin'){
+          sess=parsed; showApp(); return;
+        } else if(parsed.type==='club'||parsed.type==='trainer'){
+          const snap=await get(ref(db,`clubs/${parsed.cid}`));
+          if(snap.exists()){ sess=parsed; showApp(); return; }
+        }
+      }
+    } catch(e){}
+    localStorage.removeItem('klubSess');
+    sessionStorage.removeItem('klubSess');
+  }
   document.getElementById('loadingScreen').style.display='none';
   document.getElementById('authScreen').style.display='flex';
 }
@@ -315,6 +335,13 @@ window.toggleTrainerField=function(){
   document.getElementById('trainerUserField').style.display=isT?'block':'none';
 }
 
+function saveSess(s){
+  const rem=document.getElementById('rememberMe').checked;
+  const data=JSON.stringify(s);
+  if(rem) localStorage.setItem('klubSess',data);
+  else sessionStorage.setItem('klubSess',data);
+}
+
 window.doLogin=async function(){
   const clubName=document.getElementById('loginClub').value.trim();
   const pass=document.getElementById('loginPass').value;
@@ -327,7 +354,7 @@ window.doLogin=async function(){
 
   // Superadmin
   if(clubName.toLowerCase()==='superadmin'&&pass===SA_PASS){
-    sess={type:'superadmin'}; showApp(); return;
+    sess={type:'superadmin'}; saveSess(sess); showApp(); return;
   }
 
   // Find club
@@ -343,12 +370,12 @@ window.doLogin=async function(){
     if(!club.users){msg.textContent='❌ Няма треньори в този клуб!';return;}
     const te=Object.entries(club.users).find(([,u])=>u.username.toLowerCase()===username&&u.password===pass);
     if(!te){msg.textContent='❌ Грешно потребителско ime или парола!';return;}
-    sess={type:'trainer',cid,tid:te[0],cname:club.name}; showApp(); return;
+    sess={type:'trainer',cid,tid:te[0],cname:club.name}; saveSess(sess); showApp(); return;
   }
 
   // Club admin login
   if(club.password!==pass){msg.textContent='❌ Грешна парола!';return;}
-  sess={type:'club',cid,cname:club.name}; showApp();
+  sess={type:'club',cid,cname:club.name}; saveSess(sess); showApp();
 }
 
 window.doRegister=async function(){
@@ -376,17 +403,21 @@ window.doRegister=async function(){
 window.doLogout=function(){
   if(unsub){unsub();unsub=null;}
   sess=null;cUsers={};tData={};viewId='__all__';selCid=null;
+  localStorage.removeItem('klubSess');
+  sessionStorage.removeItem('klubSess');
   document.getElementById('appScreen').style.display='none';
   document.getElementById('authScreen').style.display='flex';
   document.getElementById('loginPass').value='';
   document.getElementById('loginClub').value='';
   document.getElementById('loginUser').value='';
   document.getElementById('isTrainer').checked=false;
+  document.getElementById('rememberMe').checked=false;
   document.getElementById('trainerUserField').style.display='none';
   document.getElementById('loginMsg').textContent='';
 }
 
 function showApp(){
+  document.getElementById('loadingScreen').style.display='none';
   document.getElementById('authScreen').style.display='none';
   document.getElementById('appScreen').style.display='block';
   updML();
