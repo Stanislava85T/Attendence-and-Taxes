@@ -303,19 +303,18 @@ let cm=new Date().getMonth(), cy=new Date().getFullYear();
 const MN=['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември'];
 
 async function init(){
-  const saved = localStorage.getItem('klubSess') || sessionStorage.getItem('klubSess');
+  const saved=localStorage.getItem('klubSess')||sessionStorage.getItem('klubSess');
   if(saved){
-    try {
-      const parsed = JSON.parse(saved);
-      if(parsed && parsed.type){
-        if(parsed.type==='superadmin'){
-          sess=parsed; showApp(); return;
-        } else if(parsed.type==='club'||parsed.type==='trainer'){
+    try{
+      const parsed=JSON.parse(saved);
+      if(parsed&&parsed.type){
+        if(parsed.type==='superadmin'){sess=parsed;showApp();return;}
+        else if(parsed.type==='club'||parsed.type==='trainer'){
           const snap=await get(ref(db,`clubs/${parsed.cid}`));
-          if(snap.exists()){ sess=parsed; showApp(); return; }
+          if(snap.exists()){sess=parsed;showApp();return;}
         }
       }
-    } catch(e){}
+    }catch(e){}
     localStorage.removeItem('klubSess');
     sessionStorage.removeItem('klubSess');
   }
@@ -337,9 +336,8 @@ window.toggleTrainerField=function(){
 
 function saveSess(s){
   const rem=document.getElementById('rememberMe').checked;
-  const data=JSON.stringify(s);
-  if(rem) localStorage.setItem('klubSess',data);
-  else sessionStorage.setItem('klubSess',data);
+  if(rem) localStorage.setItem('klubSess',JSON.stringify(s));
+  else sessionStorage.setItem('klubSess',JSON.stringify(s));
 }
 
 window.doLogin=async function(){
@@ -403,8 +401,8 @@ window.doRegister=async function(){
 window.doLogout=function(){
   if(unsub){unsub();unsub=null;}
   sess=null;cUsers={};tData={};viewId='__all__';selCid=null;
-  localStorage.removeItem('klubSess');
-  sessionStorage.removeItem('klubSess');
+  localStorage.removeItem('klubSess'); sessionStorage.removeItem('klubSess');
+  const sp=document.getElementById('superTrainerPanel'); if(sp) sp.remove();
   document.getElementById('appScreen').style.display='none';
   document.getElementById('authScreen').style.display='flex';
   document.getElementById('loginPass').value='';
@@ -466,10 +464,49 @@ async function loadSuperView(){
     const children=club.trainerData?Object.values(club.trainerData).reduce((s,d)=>s+(d.children?d.children.length:0),0):0;
     const div=document.createElement('div');
     div.className='club-card'+(selCid===id?' active':'');
-    div.innerHTML=`<div class="club-card-name">🏟️ ${club.name}</div><div class="club-card-stats"><div>Треньори: <span>${trainers}</span></div><div>Деца: <span>${children}</span></div></div>`;
-    div.onclick=(e)=>selClub(id,club.name,clubs,div);
+    div.innerHTML=`
+      <div class="club-card-name">🏟️ ${club.name}</div>
+      <div class="club-card-stats"><div>Треньори: <span>${trainers}</span></div><div>Деца: <span>${children}</span></div></div>
+      <div style="display:flex;gap:6px;margin-top:12px;" onclick="event.stopPropagation()">
+        <button style="flex:1;padding:7px;background:rgba(245,166,35,0.15);color:var(--accent2);border:1px solid rgba(245,166,35,0.3);border-radius:7px;cursor:pointer;font-size:0.75em;font-family:Sora,sans-serif;font-weight:600;" onclick="renameClub('${id}','${club.name.replace(/'/g,"\\'")}')">✏️ Ime</button>
+        <button style="flex:1;padding:7px;background:rgba(0,212,170,0.1);color:var(--green);border:1px solid rgba(0,212,170,0.3);border-radius:7px;cursor:pointer;font-size:0.75em;font-family:Sora,sans-serif;font-weight:600;" onclick="changeClubPass('${id}','${club.name.replace(/'/g,"\\'")}')">🔑 Парола</button>
+        <button style="flex:1;padding:7px;background:rgba(233,69,96,0.15);color:var(--accent);border:1px solid rgba(233,69,96,0.3);border-radius:7px;cursor:pointer;font-size:0.75em;font-family:Sora,sans-serif;font-weight:600;" onclick="deleteClub('${id}','${club.name.replace(/'/g,"\\'")}')">🗑️ Изтрий</button>
+      </div>`;
+    div.onclick=(e)=>{ if(e.target.tagName!=='BUTTON') selClub(id,club.name,clubs,div); };
     grid.appendChild(div);
   });
+}
+
+window.renameClub=async function(cid,oldName){
+  const newName=(prompt(`Ново ime за "${oldName}":`,oldName)||'').trim();
+  if(!newName||newName===oldName) return;
+  const snap=await get(ref(db,'clubs'));
+  if(snap.exists()){
+    const ex=Object.entries(snap.val()).find(([id,c])=>c.name.toLowerCase()===newName.toLowerCase()&&id!==cid);
+    if(ex){alert('❌ Клуб с това ime вече съществува!');return;}
+  }
+  await set(ref(db,`clubs/${cid}/name`),newName);
+  alert(`✅ Imeto е сменено на "${newName}"`);
+  loadSuperView();
+}
+
+window.changeClubPass=async function(cid,name){
+  const newPass=prompt(`Нова парола за клуб "${name}":`);
+  if(!newPass||newPass.length<4){if(newPass!==null)alert('❌ Паролата трябва да е поне 4 символа!');return;}
+  await set(ref(db,`clubs/${cid}/password`),newPass);
+  alert(`✅ Паролата на "${name}" е сменена!`);
+}
+
+window.deleteClub=async function(cid,name){
+  if(!confirm(`Изтрий клуб "${name}"?\n\nВСИЧКИ данни (треньори, деца, такси) ще бъдат изтрити!`)) return;
+  await remove(ref(db,`clubs/${cid}`));
+  if(selCid===cid){
+    selCid=null;
+    document.getElementById('selClubView').style.display='none';
+    document.getElementById('mainContent').style.display='none';
+    document.getElementById('viewBar').style.display='none';
+  }
+  loadSuperView();
 }
 
 async function selClub(cid,cname,clubs,el){
@@ -482,8 +519,46 @@ async function selClub(cid,cname,clubs,el){
   document.getElementById('viewBar').style.display='flex';
   const club=clubs[cid];
   cUsers=club.users||{};
+  // Show trainer management for superadmin
+  renderSuperTrainers(cid,cname);
   popViewSel(); viewId='__all__'; document.getElementById('viewSel').value='__all__';
   updML(); renderAdminOverview(cid);
+}
+
+function renderSuperTrainers(cid,cname){
+  // Remove existing super trainer panel if any
+  const existing=document.getElementById('superTrainerPanel');
+  if(existing) existing.remove();
+
+  const trainers=Object.entries(cUsers).filter(([,u])=>u.role==='trainer');
+  if(!trainers.length) return;
+
+  const panel=document.createElement('div');
+  panel.id='superTrainerPanel';
+  panel.style.cssText='background:var(--surface);border:1px solid rgba(0,212,170,0.3);border-radius:14px;padding:20px;margin-bottom:24px;';
+  panel.innerHTML=`<div style="font-size:0.9em;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">🏃 Треньори в ${cname}</div>
+  <div style="display:flex;flex-direction:column;gap:8px;">${trainers.map(([id,t])=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
+      <div><div style="font-weight:600;font-size:0.9em;">${t.name}</div><div style="color:var(--text-dim);font-size:0.78em;">@${t.username}</div></div>
+      <button onclick="superDelTrainer('${cid}','${id}','${t.name.replace(/'/g,"\\'")}','${cname.replace(/'/g,"\\'")}');" style="background:rgba(233,69,96,0.15);color:var(--accent);border:1px solid rgba(233,69,96,0.3);padding:5px 11px;border-radius:6px;cursor:pointer;font-size:0.8em;font-family:Sora,sans-serif;">🗑️ Изтрий</button>
+    </div>`).join('')}
+  </div>`;
+
+  const selView=document.getElementById('selClubView');
+  selView.parentNode.insertBefore(panel, document.getElementById('viewBar'));
+}
+
+window.superDelTrainer=async function(cid,tid,tname,cname){
+  if(!confirm(`Изтрий треньор "${tname}" от клуб "${cname}"?\n\nВсички негови данни ще бъдат изтрити!`)) return;
+  await remove(ref(db,`clubs/${cid}/users/${tid}`));
+  await remove(ref(db,`clubs/${cid}/trainerData/${tid}`));
+  delete cUsers[tid];
+  if(viewId===tid){viewId='__all__'; document.getElementById('vBadge').style.display='none';}
+  const snap=await get(ref(db,'clubs'));
+  const clubs=snap.exists()?snap.val():{};
+  renderSuperTrainers(cid,cname);
+  popViewSel();
+  renderAdminOverview(cid);
 }
 
 async function loadClubData(){
