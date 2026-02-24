@@ -306,15 +306,26 @@ async function init(){
   const saved = localStorage.getItem('klubSess') || sessionStorage.getItem('klubSess');
   if(saved){
     try {
-      sess = JSON.parse(saved);
-      document.getElementById('loadingScreen').style.display='flex';
-      document.getElementById('authScreen').style.display='none';
-      if(sess.type === 'club' || sess.type === 'trainer'){
-        const snap = await get(ref(db,`clubs/${sess.cid}`));
-        if(!snap.exists()){ sess=null; localStorage.removeItem('klubSess'); sessionStorage.removeItem('klubSess'); }
+      const parsed = JSON.parse(saved);
+      if(parsed && parsed.type){
+        // Verify still valid for club/trainer
+        if(parsed.type === 'club' || parsed.type === 'trainer'){
+          const snap = await get(ref(db,`clubs/${parsed.cid}`));
+          if(snap.exists()){
+            sess = parsed;
+            showApp();
+            return;
+          }
+        } else if(parsed.type === 'superadmin'){
+          sess = parsed;
+          showApp();
+          return;
+        }
       }
-      if(sess){ showApp(); return; }
-    } catch(e){ localStorage.removeItem('klubSess'); sessionStorage.removeItem('klubSess'); }
+    } catch(e){}
+    // Session invalid - clear it
+    localStorage.removeItem('klubSess');
+    sessionStorage.removeItem('klubSess');
   }
   document.getElementById('loadingScreen').style.display='none';
   document.getElementById('authScreen').style.display='flex';
