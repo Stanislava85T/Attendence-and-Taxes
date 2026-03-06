@@ -294,7 +294,7 @@ const FC = {
 };
 
 // === СМЕНИ ТАЗИ ПАРОЛА ===
-const SA_PASS = 'superadmin2026';
+const SA_PASS = 'superadmin2024';
 // =========================
 
 const db = getDatabase(initializeApp(FC));
@@ -498,13 +498,14 @@ window.changeClubPass=async function(cid,name){
 }
 
 window.deleteClub=async function(cid,name){
-  if(!confirm(`Изтрий клуб "${name}"?\n\nВСИЧКИ данни (треньори, деца, такси) ще бъдат изтрити!`)) return;
+  if(!confirm(`Изтрий клуб "${name}"?\n\nВСИЧКИ данни ще бъдат изтрити!`)) return;
   await remove(ref(db,`clubs/${cid}`));
   if(selCid===cid){
     selCid=null;
     document.getElementById('selClubView').style.display='none';
     document.getElementById('mainContent').style.display='none';
     document.getElementById('viewBar').style.display='none';
+    const sp=document.getElementById('superTrainerPanel'); if(sp) sp.remove();
   }
   loadSuperView();
 }
@@ -519,20 +520,16 @@ async function selClub(cid,cname,clubs,el){
   document.getElementById('viewBar').style.display='flex';
   const club=clubs[cid];
   cUsers=club.users||{};
-  // Show trainer management for superadmin
   renderSuperTrainers(cid,cname);
   popViewSel(); viewId='__all__'; document.getElementById('viewSel').value='__all__';
   updML(); renderAdminOverview(cid);
 }
 
 function renderSuperTrainers(cid,cname){
-  // Remove existing super trainer panel if any
   const existing=document.getElementById('superTrainerPanel');
   if(existing) existing.remove();
-
   const trainers=Object.entries(cUsers).filter(([,u])=>u.role==='trainer');
   if(!trainers.length) return;
-
   const panel=document.createElement('div');
   panel.id='superTrainerPanel';
   panel.style.cssText='background:var(--surface);border:1px solid rgba(0,212,170,0.3);border-radius:14px;padding:20px;margin-bottom:24px;';
@@ -543,9 +540,7 @@ function renderSuperTrainers(cid,cname){
       <button onclick="superDelTrainer('${cid}','${id}','${t.name.replace(/'/g,"\\'")}','${cname.replace(/'/g,"\\'")}');" style="background:rgba(233,69,96,0.15);color:var(--accent);border:1px solid rgba(233,69,96,0.3);padding:5px 11px;border-radius:6px;cursor:pointer;font-size:0.8em;font-family:Sora,sans-serif;">🗑️ Изтрий</button>
     </div>`).join('')}
   </div>`;
-
-  const selView=document.getElementById('selClubView');
-  selView.parentNode.insertBefore(panel, document.getElementById('viewBar'));
+  document.getElementById('viewBar').parentNode.insertBefore(panel, document.getElementById('viewBar'));
 }
 
 window.superDelTrainer=async function(cid,tid,tname,cname){
@@ -554,8 +549,6 @@ window.superDelTrainer=async function(cid,tid,tname,cname){
   await remove(ref(db,`clubs/${cid}/trainerData/${tid}`));
   delete cUsers[tid];
   if(viewId===tid){viewId='__all__'; document.getElementById('vBadge').style.display='none';}
-  const snap=await get(ref(db,'clubs'));
-  const clubs=snap.exists()?snap.val():{};
   renderSuperTrainers(cid,cname);
   popViewSel();
   renderAdminOverview(cid);
@@ -723,16 +716,19 @@ window.changeSortOrder=async function(){tData.sortOrder=document.getElementById(
 window.updFee=async function(name,field,val){
   const k=fKey(name);
   if(!tData.fees[k]) tData.fees[k]={amount:'',date:'',paid:false};
-  tData.fees[k][field]=val; await save(); renderFees();
+  tData.fees[k][field]=val;
+  renderFees(); await save();
 }
 window.togPaid=async function(name){
   const k=fKey(name);
   if(!tData.fees[k]) tData.fees[k]={amount:'',date:'',paid:false};
-  tData.fees[k].paid=!tData.fees[k].paid; await save(); renderFees();
+  tData.fees[k].paid=!tData.fees[k].paid;
+  renderFees(); await save();
 }
 window.clrFee=async function(name){
   if(!confirm(`Изчисти таксата за ${name}?`)) return;
-  delete tData.fees[fKey(name)]; await save(); renderFees();
+  delete tData.fees[fKey(name)];
+  renderFees(); await save();
 }
 
 function renderTV(){
