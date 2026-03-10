@@ -275,6 +275,11 @@ input[type="checkbox"]{width:18px;height:18px;cursor:pointer;accent-color:var(--
           </table>
         </div>
       </div>
+      <div id="saveBar" style="display:none;position:sticky;bottom:20px;text-align:center;margin-bottom:20px;">
+        <button id="saveBtn" onclick="manualSave()" style="padding:16px 48px;background:linear-gradient(135deg,var(--green),#00a884);color:#001a14;border:none;border-radius:12px;font-family:Sora,sans-serif;font-size:1em;font-weight:700;cursor:pointer;box-shadow:0 8px 24px rgba(0,212,170,0.4);transition:all 0.2s;">
+          💾 Запази промените
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -637,6 +642,10 @@ async function loadTrainerData(){
 
 function subData(cid,tid){
   if(unsub) unsub();
+  // Hide save bar when switching trainer
+  hasChanges=false;
+  const bar=document.getElementById('saveBar');
+  if(bar) bar.style.display='none';
   unsub=onValue(ref(db,`clubs/${cid}/trainerData/${tid}`),snap=>{
     tData=snap.exists()?snap.val():{};
     if(!tData.children) tData.children=[];
@@ -647,11 +656,34 @@ function subData(cid,tid){
   });
 }
 
+let hasChanges=false;
+
+function markChanged(){
+  hasChanges=true;
+  const bar=document.getElementById('saveBar');
+  if(bar) bar.style.display='block';
+}
+
 async function save(){
+  // Just mark as changed, don't save automatically
+  markChanged();
+}
+
+window.manualSave=async function(){
   const cid=sess.type==='superadmin'?selCid:sess.cid;
   const tid=sess.type==='trainer'?sess.tid:viewId;
   if(!cid||!tid||tid==='__all__') return;
+  const btn=document.getElementById('saveBtn');
+  btn.textContent='⏳ Запазва...'; btn.disabled=true;
   await set(ref(db,`clubs/${cid}/trainerData/${tid}`),tData);
+  hasChanges=false;
+  btn.textContent='✅ Запазено!'; btn.style.background='linear-gradient(135deg,#00d4aa,#00a884)';
+  setTimeout(()=>{
+    document.getElementById('saveBar').style.display='none';
+    btn.textContent='💾 Запази промените';
+    btn.disabled=false;
+    btn.style.background='';
+  },1500);
 }
 
 function updML(){document.getElementById('monthLabel').textContent=`${MN[cm]} ${cy}`;}
