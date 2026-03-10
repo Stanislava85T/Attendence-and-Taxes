@@ -675,7 +675,15 @@ window.manualSave=async function(){
   const btn=document.getElementById('saveBtn');
   btn.textContent='⏳ Запазва...'; btn.disabled=true;
   try{
-    await set(ref(db,`clubs/${cid}/trainerData/${tid}`),tData);
+    // Sanitize keys - Firebase doesn't allow . # $ / [ ]
+    const sanitize=s=>s.replace(/[.#$\/\[\]]/g,'_');
+    const cleanAtt={};
+    Object.entries(tData.attendance||{}).forEach(([k,v])=>{ cleanAtt[sanitize(k)]=v; });
+    const cleanFees={};
+    Object.entries(tData.fees||{}).forEach(([k,v])=>{ cleanFees[sanitize(k)]=v; });
+    const cleanData={...tData, attendance:cleanAtt, fees:cleanFees};
+    await set(ref(db,`clubs/${cid}/trainerData/${tid}`),cleanData);
+    tData=cleanData;
     hasChanges=false;
     btn.textContent='✅ Запазено!';
     setTimeout(()=>{
@@ -684,7 +692,7 @@ window.manualSave=async function(){
       btn.disabled=false;
     },1200);
   }catch(e){
-    console.error('Save error:',e, 'cid:',cid,'tid:',tid,'tData:',tData);
+    console.error('Save error:',e);
     btn.textContent='❌ Грешка: '+e.message;
     btn.disabled=false;
   }
@@ -711,8 +719,9 @@ function gSorted(){
   if(tData.sortOrder==='name-desc') return ch.sort((a,b)=>b.localeCompare(a,'bg'));
   return ch;
 }
-function cAtt(data,name,days){return days.filter(d=>data.attendance&&data.attendance[`${name}-${d.full}`]).length;}
-function fKey(n){return `${n}-${cy}-${cm}`;}
+function sanitizeKey(s){return s.replace(/[.#$\/\[\]]/g,'_');}
+function cAtt(data,name,days){return days.filter(d=>data.attendance&&data.attendance[`${sanitizeKey(name)}-${d.full}`]).length;}
+function fKey(n){return sanitizeKey(`${n}-${cy}-${cm}`);}
 function esc(n){return n.replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 
 window.addChild=async function(){
@@ -728,17 +737,18 @@ window.editChild=async function(old){
   if(tData.children.includes(n)){alert('Вече съществува!');return;}
   tData.children[tData.children.indexOf(old)]=n;
   const att={};
-  Object.keys(tData.attendance).forEach(k=>{att[k.startsWith(old+'-')?n+k.slice(old.length):k]=tData.attendance[k];});
+  Object.keys(tData.attendance).forEach(k=>{att[k.startsWith(sanitizeKey(old)+'-')?sanitizeKey(n)+k.slice(sanitizeKey(old).length):k]=tData.attendance[k];});
   tData.attendance=att; await save();
 }
 window.delChild=async function(name){
   if(!confirm(`Изтрий ${name}?`)) return;
   tData.children=tData.children.filter(c=>c!==name);
-  Object.keys(tData.attendance).forEach(k=>{if(k.startsWith(name+'-')) delete tData.attendance[k];});
+  const sk=sanitizeKey(name);
+  Object.keys(tData.attendance).forEach(k=>{if(k.startsWith(sk+'-')) delete tData.attendance[k];});
   await save();
 }
 window.togAtt=async function(name,date){
-  tData.attendance[`${name}-${date}`]=!tData.attendance[`${name}-${date}`]; await save();
+  tData.attendance[`${sanitizeKey(name)}-${date}`]=!tData.attendance[`${sanitizeKey(name)}-${date}`]; await save();
 }
 window.mvUp=async function(name){
   const i=tData.children.indexOf(name);
@@ -785,7 +795,7 @@ function renderTable(days){
     const oi=tData.children.indexOf(name),isF=oi===0,isL=oi===tData.children.length-1;
     let nc=isC?`<div class="nm"><div class="mc"><button class="mb" onclick="mvUp('${esc(name)}');return false;" ${isF?'disabled':''}>▲</button><button class="mb" onclick="mvDn('${esc(name)}');return false;" ${isL?'disabled':''}>▼</button></div>${name}</div>`:name;
     let row=`<td class="ntd">${nc}</td>`;
-    days.forEach(day=>{row+=`<td class="${day.tod?'td-tod':''} ${day.we?'td-we':''}"><input type="checkbox" ${tData.attendance[`${name}-${day.full}`]?'checked':''} onchange="togAtt('${esc(name)}','${day.full}')"></td>`;});
+    days.forEach(day=>{row+=`<td class="${day.tod?'td-tod':''} ${day.we?'td-we':''}"><input type="checkbox" ${tData.attendance[`${sanitizeKey(name)}-${day.full}`]?'checked':''} onchange="togAtt('${esc(name)}','${day.full}')"></td>`;});
     const mt=cAtt(tData,name,days);
     row+=`<td class="tc">${mt}</td><td><div class="ra"><button class="be" onclick="editChild('${esc(name)}')">✏️</button><button class="bd" onclick="delChild('${esc(name)}')">🗑️</button></div></td>`;
     const tr=document.createElement('tr'); tr.innerHTML=row; tbody.appendChild(tr);
@@ -839,7 +849,7 @@ function renderFees(){
 
 function renderStats(days){
   const total=tData.children.reduce((s,c)=>s+cAtt(tData,c,days),0);
-  const tdays=days.filter(day=>tData.children.some(c=>tData.attendance[`${c}-${day.full}`])).length;
+  const tdays=days.filter(day=>tData.children.some(c=>tData.attendance[`${sanitizeKey(c)}-${day.full}`])).length;
   const max=tData.children.length*days.length;
   document.getElementById('stCh').textContent=tData.children.length;
   document.getElementById('stDy').textContent=days.length;
@@ -892,7 +902,7 @@ window.exportExcel=function(){
   if(!tData.children||!tData.children.length){alert('Няма данни!');return;}
   const days=gDays();
   const rows=[[`Присъствие — ${MN[cm]} ${cy}`],[],['Дете',...days.map(d=>`${d.name} ${d.n}`),'ОБЩО']];
-  tData.children.forEach(c=>{rows.push([c,...days.map(d=>tData.attendance[`${c}-${d.full}`]?'Да':''),cAtt(tData,c,days)]);});
+  tData.children.forEach(c=>{rows.push([c,...days.map(d=>tData.attendance[`${sanitizeKey(c)}-${d.full}`]?'Да':''),cAtt(tData,c,days)]);});
   const fRows=[[`Такси — ${MN[cm]} ${cy}`],[],['Дете','Сума (€)','Дата','Статус']];
   let tp=0;
   tData.children.forEach(c=>{const f=tData.fees[fKey(c)];if(f&&f.amount){fRows.push([c,f.amount,f.date||'',f.paid?'Платена':'Неплатена']);if(f.paid)tp+=parseFloat(f.amount)||0;}});
