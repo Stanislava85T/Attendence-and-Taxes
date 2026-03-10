@@ -557,7 +557,18 @@ window.superDelTrainer=async function(cid,tid,tname,cname){
 async function loadClubData(){
   const snap=await get(ref(db,`clubs/${sess.cid}/users`));
   cUsers=snap.exists()?snap.val():{};
-  renderAdminPanel(); popViewSel(); viewId='__all__'; renderAdminOverview(sess.cid);
+  renderAdminPanel(); popViewSel();
+  // Auto-select if only one trainer
+  const trainers=Object.entries(cUsers).filter(([,u])=>u.role==='trainer');
+  if(trainers.length===1){
+    viewId=trainers[0][0];
+    document.getElementById('viewSel').value=viewId;
+    const badge=document.getElementById('vBadge');
+    badge.textContent=`👁️ ${trainers[0][1].name}`; badge.style.display='inline-block';
+    subData(sess.cid,viewId);
+  } else {
+    viewId='__all__'; renderAdminOverview(sess.cid);
+  }
 }
 
 function renderAdminPanel(){
@@ -636,8 +647,9 @@ async function loadTrainerData(){
 }
 
 function subData(cid,tid){
-  if(unsub) unsub();
-  unsub=onValue(ref(db,`clubs/${cid}/trainerData/${tid}`),snap=>{
+  if(unsub){unsub();unsub=null;}
+  // Use get instead of onValue to prevent re-render conflicts
+  get(ref(db,`clubs/${cid}/trainerData/${tid}`)).then(snap=>{
     tData=snap.exists()?snap.val():{};
     if(!tData.children) tData.children=[];
     if(!tData.attendance) tData.attendance={};
@@ -650,7 +662,10 @@ function subData(cid,tid){
 async function save(){
   const cid=sess.type==='superadmin'?selCid:sess.cid;
   const tid=sess.type==='trainer'?sess.tid:viewId;
-  if(!cid||!tid||tid==='__all__') return;
+  if(!cid||!tid||tid==='__all__'){
+    alert('⚠️ Избери конкретен треньор от менюто "Преглед" за да запазиш промените!');
+    return;
+  }
   await set(ref(db,`clubs/${cid}/trainerData/${tid}`),tData);
 }
 
@@ -717,18 +732,20 @@ window.updFee=async function(name,field,val){
   const k=fKey(name);
   if(!tData.fees[k]) tData.fees[k]={amount:'',date:'',paid:false};
   tData.fees[k][field]=val;
-  renderFees(); await save();
+  await save();
 }
 window.togPaid=async function(name){
   const k=fKey(name);
   if(!tData.fees[k]) tData.fees[k]={amount:'',date:'',paid:false};
   tData.fees[k].paid=!tData.fees[k].paid;
-  renderFees(); await save();
+  await save();
+  renderFees();
 }
 window.clrFee=async function(name){
   if(!confirm(`Изчисти таксата за ${name}?`)) return;
   delete tData.fees[fKey(name)];
-  renderFees(); await save();
+  await save();
+  renderFees();
 }
 
 function renderTV(){
