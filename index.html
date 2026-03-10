@@ -299,7 +299,7 @@ const FC = {
 };
 
 // === СМЕНИ ТАЗИ ПАРОЛА ===
-const SA_PASS = 'superadmin2026';
+const SA_PASS = 'superadmin2024';
 // =========================
 
 const db = getDatabase(initializeApp(FC));
@@ -684,7 +684,8 @@ window.manualSave=async function(){
       btn.disabled=false;
     },1200);
   }catch(e){
-    btn.textContent='❌ Грешка — опитай пак';
+    console.error('Save error:',e, 'cid:',cid,'tid:',tid,'tData:',tData);
+    btn.textContent='❌ Грешка: '+e.message;
     btn.disabled=false;
   }
 }
