@@ -729,7 +729,7 @@ window.addChild=async function(){
   const name=document.getElementById('childName').value.trim();
   if(!name){alert('Въведи ime!');return;}
   if(tData.children.includes(name)){alert('Детето вече е добавено!');return;}
-  tData.children.push(name); document.getElementById('childName').value=''; await save();
+  tData.children.push(name); document.getElementById('childName').value=''; await save(); renderTV();
 }
 window.editChild=async function(old){
   const n=(prompt('Промени imeto:',old)||'').trim();
@@ -738,27 +738,27 @@ window.editChild=async function(old){
   tData.children[tData.children.indexOf(old)]=n;
   const att={};
   Object.keys(tData.attendance).forEach(k=>{att[k.startsWith(sanitizeKey(old)+'-')?sanitizeKey(n)+k.slice(sanitizeKey(old).length):k]=tData.attendance[k];});
-  tData.attendance=att; await save();
+  tData.attendance=att; await save(); renderTV();
 }
 window.delChild=async function(name){
   if(!confirm(`Изтрий ${name}?`)) return;
   tData.children=tData.children.filter(c=>c!==name);
   const sk=sanitizeKey(name);
   Object.keys(tData.attendance).forEach(k=>{if(k.startsWith(sk+'-')) delete tData.attendance[k];});
-  await save();
+  await save(); renderTV();
 }
 window.togAtt=async function(name,date){
   tData.attendance[`${sanitizeKey(name)}-${date}`]=!tData.attendance[`${sanitizeKey(name)}-${date}`]; await save();
 }
 window.mvUp=async function(name){
   const i=tData.children.indexOf(name);
-  if(i>0){[tData.children[i-1],tData.children[i]]=[tData.children[i],tData.children[i-1]];await save();}
+  if(i>0){[tData.children[i-1],tData.children[i]]=[tData.children[i],tData.children[i-1]];await save(); renderTV();}
 }
 window.mvDn=async function(name){
   const i=tData.children.indexOf(name);
-  if(i<tData.children.length-1){[tData.children[i],tData.children[i+1]]=[tData.children[i+1],tData.children[i]];await save();}
+  if(i<tData.children.length-1){[tData.children[i],tData.children[i+1]]=[tData.children[i+1],tData.children[i]];await save(); renderTV();}
 }
-window.changeSortOrder=async function(){tData.sortOrder=document.getElementById('sortOrder').value;await save();}
+window.changeSortOrder=async function(){tData.sortOrder=document.getElementById('sortOrder').value;await save(); renderTV();}
 window.updFee=async function(name,field,val){
   const k=fKey(name);
   if(!tData.fees[k]) tData.fees[k]={amount:'',date:'',paid:false};
