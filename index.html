@@ -641,12 +641,11 @@ async function loadTrainerData(){
 }
 
 function subData(cid,tid){
-  if(unsub) unsub();
-  // Hide save bar when switching trainer
+  if(unsub){unsub();unsub=null;}
   hasChanges=false;
   const bar=document.getElementById('saveBar');
   if(bar) bar.style.display='none';
-  unsub=onValue(ref(db,`clubs/${cid}/trainerData/${tid}`),snap=>{
+  get(ref(db,`clubs/${cid}/trainerData/${tid}`)).then(snap=>{
     tData=snap.exists()?snap.val():{};
     if(!tData.children) tData.children=[];
     if(!tData.attendance) tData.attendance={};
@@ -675,15 +674,19 @@ window.manualSave=async function(){
   if(!cid||!tid||tid==='__all__') return;
   const btn=document.getElementById('saveBtn');
   btn.textContent='⏳ Запазва...'; btn.disabled=true;
-  await set(ref(db,`clubs/${cid}/trainerData/${tid}`),tData);
-  hasChanges=false;
-  btn.textContent='✅ Запазено!'; btn.style.background='linear-gradient(135deg,#00d4aa,#00a884)';
-  setTimeout(()=>{
-    document.getElementById('saveBar').style.display='none';
-    btn.textContent='💾 Запази промените';
+  try{
+    await set(ref(db,`clubs/${cid}/trainerData/${tid}`),tData);
+    hasChanges=false;
+    btn.textContent='✅ Запазено!';
+    setTimeout(()=>{
+      document.getElementById('saveBar').style.display='none';
+      btn.textContent='💾 Запази промените';
+      btn.disabled=false;
+    },1200);
+  }catch(e){
+    btn.textContent='❌ Грешка — опитай пак';
     btn.disabled=false;
-    btn.style.background='';
-  },1500);
+  }
 }
 
 function updML(){document.getElementById('monthLabel').textContent=`${MN[cm]} ${cy}`;}
