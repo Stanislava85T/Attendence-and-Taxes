@@ -303,9 +303,9 @@ let cm=new Date().getMonth(), cy=new Date().getFullYear();
 const MN=['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември'];
 
 async function init(){
-  try{
-    const saved=localStorage.getItem('klubSess')||sessionStorage.getItem('klubSess');
-    if(saved){
+  const saved=localStorage.getItem('klubSess')||sessionStorage.getItem('klubSess');
+  if(saved){
+    try{
       const parsed=JSON.parse(saved);
       if(parsed&&parsed.type){
         if(parsed.type==='superadmin'){sess=parsed;showApp();return;}
@@ -314,10 +314,10 @@ async function init(){
           if(snap.exists()){sess=parsed;showApp();return;}
         }
       }
-      localStorage.removeItem('klubSess');
-      sessionStorage.removeItem('klubSess');
-    }
-  }catch(e){}
+    }catch(e){}
+    localStorage.removeItem('klubSess');
+    sessionStorage.removeItem('klubSess');
+  }
   document.getElementById('loadingScreen').style.display='none';
   document.getElementById('authScreen').style.display='flex';
 }
@@ -402,6 +402,7 @@ window.doLogout=function(){
   if(unsub){unsub();unsub=null;}
   sess=null;cUsers={};tData={};viewId='__all__';selCid=null;
   localStorage.removeItem('klubSess'); sessionStorage.removeItem('klubSess');
+  const sp=document.getElementById('superTrainerPanel'); if(sp) sp.remove();
   document.getElementById('appScreen').style.display='none';
   document.getElementById('authScreen').style.display='flex';
   document.getElementById('loginPass').value='';
@@ -488,21 +489,23 @@ window.renameClub=async function(cid,oldName){
   alert(`✅ Imeto е сменено на "${newName}"`);
   loadSuperView();
 }
+
 window.changeClubPass=async function(cid,name){
   const newPass=prompt(`Нова парола за клуб "${name}":`);
   if(!newPass||newPass.length<4){if(newPass!==null)alert('❌ Паролата трябва да е поне 4 символа!');return;}
   await set(ref(db,`clubs/${cid}/password`),newPass);
   alert(`✅ Паролата на "${name}" е сменена!`);
 }
+
 window.deleteClub=async function(cid,name){
   if(!confirm(`Изтрий клуб "${name}"?\n\nВСИЧКИ данни ще бъдат изтрити!`)) return;
   await remove(ref(db,`clubs/${cid}`));
   if(selCid===cid){
     selCid=null;
-    const sp=document.getElementById('superTrainerPanel'); if(sp) sp.remove();
     document.getElementById('selClubView').style.display='none';
     document.getElementById('mainContent').style.display='none';
     document.getElementById('viewBar').style.display='none';
+    const sp=document.getElementById('superTrainerPanel'); if(sp) sp.remove();
   }
   loadSuperView();
 }
@@ -523,7 +526,8 @@ async function selClub(cid,cname,clubs,el){
 }
 
 function renderSuperTrainers(cid,cname){
-  const existing=document.getElementById('superTrainerPanel'); if(existing) existing.remove();
+  const existing=document.getElementById('superTrainerPanel');
+  if(existing) existing.remove();
   const trainers=Object.entries(cUsers).filter(([,u])=>u.role==='trainer');
   if(!trainers.length) return;
   const panel=document.createElement('div');
@@ -536,15 +540,18 @@ function renderSuperTrainers(cid,cname){
       <button onclick="superDelTrainer('${cid}','${id}','${t.name.replace(/'/g,"\\'")}','${cname.replace(/'/g,"\\'")}');" style="background:rgba(233,69,96,0.15);color:var(--accent);border:1px solid rgba(233,69,96,0.3);padding:5px 11px;border-radius:6px;cursor:pointer;font-size:0.8em;font-family:Sora,sans-serif;">🗑️ Изтрий</button>
     </div>`).join('')}
   </div>`;
-  document.getElementById('viewBar').parentNode.insertBefore(panel,document.getElementById('viewBar'));
+  document.getElementById('viewBar').parentNode.insertBefore(panel, document.getElementById('viewBar'));
 }
+
 window.superDelTrainer=async function(cid,tid,tname,cname){
-  if(!confirm(`Изтрий треньор "${tname}" от клуб "${cname}"?`)) return;
+  if(!confirm(`Изтрий треньор "${tname}" от клуб "${cname}"?\n\nВсички негови данни ще бъдат изтрити!`)) return;
   await remove(ref(db,`clubs/${cid}/users/${tid}`));
   await remove(ref(db,`clubs/${cid}/trainerData/${tid}`));
   delete cUsers[tid];
   if(viewId===tid){viewId='__all__'; document.getElementById('vBadge').style.display='none';}
-  renderSuperTrainers(cid,cname); popViewSel(); renderAdminOverview(cid);
+  renderSuperTrainers(cid,cname);
+  popViewSel();
+  renderAdminOverview(cid);
 }
 
 async function loadClubData(){
@@ -628,12 +635,9 @@ async function loadTrainerData(){
   subData(sess.cid,sess.tid);
 }
 
-let isSaving=false;
-
 function subData(cid,tid){
   if(unsub) unsub();
   unsub=onValue(ref(db,`clubs/${cid}/trainerData/${tid}`),snap=>{
-    if(isSaving) return;
     tData=snap.exists()?snap.val():{};
     if(!tData.children) tData.children=[];
     if(!tData.attendance) tData.attendance={};
@@ -647,9 +651,7 @@ async function save(){
   const cid=sess.type==='superadmin'?selCid:sess.cid;
   const tid=sess.type==='trainer'?sess.tid:viewId;
   if(!cid||!tid||tid==='__all__') return;
-  isSaving=true;
   await set(ref(db,`clubs/${cid}/trainerData/${tid}`),tData);
-  isSaving=false;
 }
 
 function updML(){document.getElementById('monthLabel').textContent=`${MN[cm]} ${cy}`;}
@@ -714,16 +716,19 @@ window.changeSortOrder=async function(){tData.sortOrder=document.getElementById(
 window.updFee=async function(name,field,val){
   const k=fKey(name);
   if(!tData.fees[k]) tData.fees[k]={amount:'',date:'',paid:false};
-  tData.fees[k][field]=val; await save(); renderFees();
+  tData.fees[k][field]=val;
+  renderFees(); await save();
 }
 window.togPaid=async function(name){
   const k=fKey(name);
   if(!tData.fees[k]) tData.fees[k]={amount:'',date:'',paid:false};
-  tData.fees[k].paid=!tData.fees[k].paid; await save(); renderFees();
+  tData.fees[k].paid=!tData.fees[k].paid;
+  renderFees(); await save();
 }
 window.clrFee=async function(name){
   if(!confirm(`Изчисти таксата за ${name}?`)) return;
-  delete tData.fees[fKey(name)]; await save(); renderFees();
+  delete tData.fees[fKey(name)];
+  renderFees(); await save();
 }
 
 function renderTV(){
