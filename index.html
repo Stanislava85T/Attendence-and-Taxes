@@ -306,16 +306,14 @@ async function init(){
   try{
     const saved=localStorage.getItem('klubSess')||sessionStorage.getItem('klubSess');
     if(saved){
-      try{
-        const parsed=JSON.parse(saved);
-        if(parsed&&parsed.type){
-          if(parsed.type==='superadmin'){sess=parsed;showApp();return;}
-          else if(parsed.type==='club'||parsed.type==='trainer'){
-            const snap=await get(ref(db,`clubs/${parsed.cid}`));
-            if(snap.exists()){sess=parsed;showApp();return;}
-          }
+      const parsed=JSON.parse(saved);
+      if(parsed&&parsed.type){
+        if(parsed.type==='superadmin'){sess=parsed;showApp();return;}
+        else if(parsed.type==='club'||parsed.type==='trainer'){
+          const snap=await get(ref(db,`clubs/${parsed.cid}`));
+          if(snap.exists()){sess=parsed;showApp();return;}
         }
-      }catch(e){}
+      }
       localStorage.removeItem('klubSess');
       sessionStorage.removeItem('klubSess');
     }
@@ -404,7 +402,6 @@ window.doLogout=function(){
   if(unsub){unsub();unsub=null;}
   sess=null;cUsers={};tData={};viewId='__all__';selCid=null;
   localStorage.removeItem('klubSess'); sessionStorage.removeItem('klubSess');
-  const sp=document.getElementById('superTrainerPanel'); if(sp) sp.remove();
   document.getElementById('appScreen').style.display='none';
   document.getElementById('authScreen').style.display='flex';
   document.getElementById('loginPass').value='';
@@ -491,23 +488,21 @@ window.renameClub=async function(cid,oldName){
   alert(`✅ Imeto е сменено на "${newName}"`);
   loadSuperView();
 }
-
 window.changeClubPass=async function(cid,name){
   const newPass=prompt(`Нова парола за клуб "${name}":`);
   if(!newPass||newPass.length<4){if(newPass!==null)alert('❌ Паролата трябва да е поне 4 символа!');return;}
   await set(ref(db,`clubs/${cid}/password`),newPass);
   alert(`✅ Паролата на "${name}" е сменена!`);
 }
-
 window.deleteClub=async function(cid,name){
   if(!confirm(`Изтрий клуб "${name}"?\n\nВСИЧКИ данни ще бъдат изтрити!`)) return;
   await remove(ref(db,`clubs/${cid}`));
   if(selCid===cid){
     selCid=null;
+    const sp=document.getElementById('superTrainerPanel'); if(sp) sp.remove();
     document.getElementById('selClubView').style.display='none';
     document.getElementById('mainContent').style.display='none';
     document.getElementById('viewBar').style.display='none';
-    const sp=document.getElementById('superTrainerPanel'); if(sp) sp.remove();
   }
   loadSuperView();
 }
@@ -528,8 +523,7 @@ async function selClub(cid,cname,clubs,el){
 }
 
 function renderSuperTrainers(cid,cname){
-  const existing=document.getElementById('superTrainerPanel');
-  if(existing) existing.remove();
+  const existing=document.getElementById('superTrainerPanel'); if(existing) existing.remove();
   const trainers=Object.entries(cUsers).filter(([,u])=>u.role==='trainer');
   if(!trainers.length) return;
   const panel=document.createElement('div');
@@ -542,35 +536,21 @@ function renderSuperTrainers(cid,cname){
       <button onclick="superDelTrainer('${cid}','${id}','${t.name.replace(/'/g,"\\'")}','${cname.replace(/'/g,"\\'")}');" style="background:rgba(233,69,96,0.15);color:var(--accent);border:1px solid rgba(233,69,96,0.3);padding:5px 11px;border-radius:6px;cursor:pointer;font-size:0.8em;font-family:Sora,sans-serif;">🗑️ Изтрий</button>
     </div>`).join('')}
   </div>`;
-  document.getElementById('viewBar').parentNode.insertBefore(panel, document.getElementById('viewBar'));
+  document.getElementById('viewBar').parentNode.insertBefore(panel,document.getElementById('viewBar'));
 }
-
 window.superDelTrainer=async function(cid,tid,tname,cname){
-  if(!confirm(`Изтрий треньор "${tname}" от клуб "${cname}"?\n\nВсички негови данни ще бъдат изтрити!`)) return;
+  if(!confirm(`Изтрий треньор "${tname}" от клуб "${cname}"?`)) return;
   await remove(ref(db,`clubs/${cid}/users/${tid}`));
   await remove(ref(db,`clubs/${cid}/trainerData/${tid}`));
   delete cUsers[tid];
   if(viewId===tid){viewId='__all__'; document.getElementById('vBadge').style.display='none';}
-  renderSuperTrainers(cid,cname);
-  popViewSel();
-  renderAdminOverview(cid);
+  renderSuperTrainers(cid,cname); popViewSel(); renderAdminOverview(cid);
 }
 
 async function loadClubData(){
   const snap=await get(ref(db,`clubs/${sess.cid}/users`));
   cUsers=snap.exists()?snap.val():{};
-  renderAdminPanel(); popViewSel();
-  // Auto-select if only one trainer
-  const trainers=Object.entries(cUsers).filter(([,u])=>u.role==='trainer');
-  if(trainers.length===1){
-    viewId=trainers[0][0];
-    document.getElementById('viewSel').value=viewId;
-    const badge=document.getElementById('vBadge');
-    badge.textContent=`👁️ ${trainers[0][1].name}`; badge.style.display='inline-block';
-    subData(sess.cid,viewId);
-  } else {
-    viewId='__all__'; renderAdminOverview(sess.cid);
-  }
+  renderAdminPanel(); popViewSel(); viewId='__all__'; renderAdminOverview(sess.cid);
 }
 
 function renderAdminPanel(){
@@ -648,10 +628,12 @@ async function loadTrainerData(){
   subData(sess.cid,sess.tid);
 }
 
+let isSaving=false;
+
 function subData(cid,tid){
-  if(unsub){unsub();unsub=null;}
-  // Use get instead of onValue to prevent re-render conflicts
-  get(ref(db,`clubs/${cid}/trainerData/${tid}`)).then(snap=>{
+  if(unsub) unsub();
+  unsub=onValue(ref(db,`clubs/${cid}/trainerData/${tid}`),snap=>{
+    if(isSaving) return;
     tData=snap.exists()?snap.val():{};
     if(!tData.children) tData.children=[];
     if(!tData.attendance) tData.attendance={};
@@ -665,7 +647,9 @@ async function save(){
   const cid=sess.type==='superadmin'?selCid:sess.cid;
   const tid=sess.type==='trainer'?sess.tid:viewId;
   if(!cid||!tid||tid==='__all__') return;
+  isSaving=true;
   await set(ref(db,`clubs/${cid}/trainerData/${tid}`),tData);
+  isSaving=false;
 }
 
 function updML(){document.getElementById('monthLabel').textContent=`${MN[cm]} ${cy}`;}
@@ -730,28 +714,16 @@ window.changeSortOrder=async function(){tData.sortOrder=document.getElementById(
 window.updFee=async function(name,field,val){
   const k=fKey(name);
   if(!tData.fees[k]) tData.fees[k]={amount:'',date:'',paid:false};
-  tData.fees[k][field]=val;
-  await save();
-  // Only update the status/buttons for this row, not re-render everything
-  const fee=tData.fees[k];
-  const rowId='fee-row-'+k.replace(/[^a-zA-Z0-9]/g,'_');
-  const statusEl=document.getElementById('status-'+rowId);
-  const btnsEl=document.getElementById('btns-'+rowId);
-  if(statusEl) statusEl.innerHTML=fee.amount?(fee.paid?'<span class="bp">✓ Платена</span>':'<span class="bu">✗ Неплатена</span>'):'<span style="color:var(--text-dim);font-size:0.8em;">—</span>';
-  if(btnsEl) btnsEl.innerHTML=fee.amount?`<button class="${fee.paid?'bpn':'bpy'}" onclick="togPaid('${esc(name)}')">${fee.paid?'Отмаркирай':'Маркирай платена'}</button><button class="bpn" onclick="clrFee('${esc(name)}')">Изчисти</button>`:'';
+  tData.fees[k][field]=val; await save(); renderFees();
 }
 window.togPaid=async function(name){
   const k=fKey(name);
   if(!tData.fees[k]) tData.fees[k]={amount:'',date:'',paid:false};
-  tData.fees[k].paid=!tData.fees[k].paid;
-  await save();
-  renderFees();
+  tData.fees[k].paid=!tData.fees[k].paid; await save(); renderFees();
 }
 window.clrFee=async function(name){
   if(!confirm(`Изчисти таксата за ${name}?`)) return;
-  delete tData.fees[fKey(name)];
-  await save();
-  renderFees();
+  delete tData.fees[fKey(name)]; await save(); renderFees();
 }
 
 function renderTV(){
@@ -799,7 +771,6 @@ function renderFees(){
   gSorted().forEach(name=>{
     const k=fKey(name),fee=tData.fees[k]||{amount:'',date:'',paid:false};
     if(fee.amount&&fee.paid){col+=parseFloat(fee.amount)||0;pc++;}
-    const rowId='fee-row-'+k.replace(/[^a-zA-Z0-9]/g,'_');
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td style="padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);">
@@ -810,8 +781,8 @@ function renderFees(){
         </div>
       </td>
       <td style="text-align:right;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);">
-        <div id="status-${rowId}" style="margin-bottom:8px;">${fee.amount?(fee.paid?'<span class="bp">✓ Платена</span>':'<span class="bu">✗ Неплатена</span>'):'<span style="color:var(--text-dim);font-size:0.8em;">—</span>'}</div>
-        <div id="btns-${rowId}" style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap;">
+        <div style="margin-bottom:8px;">${fee.amount?(fee.paid?'<span class="bp">✓ Платена</span>':'<span class="bu">✗ Неплатена</span>'):'<span style="color:var(--text-dim);font-size:0.8em;">—</span>'}</div>
+        <div style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap;">
           ${fee.amount?`<button class="${fee.paid?'bpn':'bpy'}" onclick="togPaid('${esc(name)}')">${fee.paid?'Отмаркирай':'Маркирай платена'}</button>`:''}
           ${fee.amount?`<button class="bpn" onclick="clrFee('${esc(name)}')">Изчисти</button>`:''}
         </div>
